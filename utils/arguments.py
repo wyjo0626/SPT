@@ -348,7 +348,7 @@ class DynamicPeftArguments:
         },
     )
     prune_steps: int = field(
-        default=4,
+        default=3,
         metadata={
             "help": "Pruning as much as steps during training"
         }
