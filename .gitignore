@@ -1,0 +1,7 @@
+# result
+/checkpoints
+/wandb
+
+# test
+__pycache__
+/test
