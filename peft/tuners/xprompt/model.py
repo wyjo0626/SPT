@@ -70,11 +70,9 @@ class XPromptEmbedding(torch.nn.Module):
         
         self.config = config
         
-        total_virtual_tokens = self.current_virtual_tokens
-        self.original_virtual_tokens = total_virtual_tokens
-        device = word_embeddings.weight.device
-        self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
-        self.token_mask = torch.ones(total_virtual_tokens)
+        self._crnt_virtual_tokens = config.num_virtual_tokens
+        self.embedding = torch.nn.Embedding(self.orig_total_virtual_tokens, config.token_dim)
+        self.token_mask = torch.ones(self.orig_total_virtual_tokens)
         # self.piece_mask = torch.nn.ones()
         
         self.to_prune = {
@@ -82,13 +80,13 @@ class XPromptEmbedding(torch.nn.Module):
             # "piece-level": set(),
             }
         self.kept_prune = {
-            self.token_prefix: set(range(total_virtual_tokens)), 
+            self.token_prefix: set(range(self.orig_total_virtual_tokens)), 
             # "piece-level": set(),
         }
         
         # prune steps and rewinding step.
         self.total_steps = config.prune_steps + 1
-        self.current_prune_step = 0
+        self.crnt_prune_step = 0
         
         if config.xprompt_tuning_init == XPromptTuningInit.TEXT:
             from transformers import AutoTokenizer
@@ -99,13 +97,13 @@ class XPromptEmbedding(torch.nn.Module):
             init_token_ids = tokenizer(init_text)["input_ids"]
             # Trim or iterate until num_text_tokens matches total_virtual_tokens
             num_text_tokens = len(init_token_ids)
-            if num_text_tokens > total_virtual_tokens:
-                init_token_ids = init_token_ids[:total_virtual_tokens]
-            elif num_text_tokens < total_virtual_tokens:
-                num_reps = math.ceil(total_virtual_tokens / num_text_tokens)
+            if num_text_tokens > self.orig_total_virtual_tokens:
+                init_token_ids = init_token_ids[:self.orig_total_virtual_tokens]
+            elif num_text_tokens < self.orig_total_virtual_tokens:
+                num_reps = math.ceil(self.orig_total_virtual_tokens / num_text_tokens)
                 init_token_ids = init_token_ids * num_reps
-            init_token_ids = init_token_ids[:total_virtual_tokens]
-            init_token_ids = torch.LongTensor(init_token_ids).to(device)
+            init_token_ids = init_token_ids[:self.orig_total_virtual_tokens]
+            init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
 
             word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
             word_embedding_weights = word_embedding_weights.to(torch.float32)
@@ -135,14 +133,14 @@ class XPromptEmbedding(torch.nn.Module):
         
         return importance, mask
 
-    def estimate_token_importance(self, trainer, total_steps, current_steps):
+    def estimate_token_importance(self, trainer, total_steps, crnt_steps):
         """Train the model for one epoch to prune the negative token"""
         prune_steps = total_steps // self.total_steps
-        self.current_prune_step = current_steps // prune_steps
+        self.crnt_prune_step = crnt_steps // prune_steps
         # only prune the token in prune steps, not 0 and total steps (rewinding steps)
-        if (current_steps % prune_steps != 0 or 
-            self.current_prune_step == 0 or
-            self.current_prune_step == self.total_steps):
+        if (crnt_steps % prune_steps != 0 or 
+            self.crnt_prune_step == 0 or
+            self.crnt_prune_step == self.total_steps):
             return
         
         logger.info(f"*** {colorstr('cyan', 'bold', 'Pruning Tokens')} ***")
@@ -156,7 +154,7 @@ class XPromptEmbedding(torch.nn.Module):
         
         # piece_mask = torch.ones(total_virtual_tokens).to(device)
         embed_importance = {
-            self.token_prefix: torch.zeros(self.original_virtual_tokens).to(device)
+            self.token_prefix: torch.zeros(self.orig_total_virtual_tokens).to(device)
             # "piece-level": torch.zeros(total_virtual_tokens).to(device)
         }
         denoms = {attn_type: val.clone() for attn_type, val in embed_importance.items()}
@@ -201,13 +199,13 @@ class XPromptEmbedding(torch.nn.Module):
         logger.info(f"*** {colorstr('cyan', 'bold', 'pruned')} ***\n{self.to_prune}")
         logger.info(f"*** {colorstr('cyan', 'bold', 'kept')} ***\n{self.kept_prune}\n")
         
-        self.config.num_virtual_tokens = int(self.config.num_virtual_tokens * self.config.token_ratio)
+        self._crnt_virtual_tokens = int(self._crnt_virtual_tokens * self.config.token_ratio)
     
     def get_profile(self, importance, prefix):
         shp = importance.shape
         
         # target token length
-        target_token_length = int(self.current_virtual_tokens * self.config.token_ratio)
+        target_token_length = int(self.crnt_total_virtual_tokens * self.config.token_ratio)
         
         if len(shp) == 1:
             # token profile
@@ -227,8 +225,18 @@ class XPromptEmbedding(torch.nn.Module):
             None
         
         return profile
-    
+    crnt
     @property
-    def current_virtual_tokens(self):
+    def crnt_total_virtual_tokens(self):
         # get (ininitalized or pruned) virtual token length
-        return self.config.num_virtual_tokens * self.config.num_transformer_submodules
+        return self._crnt_virtual_tokens * self.config.num_transformer_submodules
+
+    @property
+    def crnt_virtual_tokens(self):
+        # get current virtual token length
+        return self._crnt_virtual_tokens
+
+    @property
+    def orig_total_virtual_tokens(self):
+        # get original virtual token length
+        return self.confiug.num_virtual_tokens * self.config.num_transformer_submodules
