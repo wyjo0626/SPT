@@ -225,7 +225,7 @@ class XPromptEmbedding(torch.nn.Module):
             None
         
         return profile
-    crnt
+    
     @property
     def crnt_total_virtual_tokens(self):
         # get (ininitalized or pruned) virtual token length
