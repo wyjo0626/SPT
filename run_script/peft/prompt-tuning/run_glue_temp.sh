@@ -37,7 +37,8 @@ for MODEL_NAME in $MODELS_NAME; do
           --weight_decay $weight_decay \
           --save_total_limit 1 \
           --peft_type $PEFT_TYPE \
-          --num_virtual_tokens $var;
+          --num_virtual_tokens $var \
+          --prune_steps 2;
       done;
     done;
   done;

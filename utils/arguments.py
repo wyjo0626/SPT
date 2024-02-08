@@ -353,11 +353,11 @@ class DynamicPeftArguments:
             "help": "Pruning as much as steps during training"
         }
     )
-    token_ratio: int = field(
+    token_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt tokens"}
     )
-    piece_ratio: int = field(
+    piece_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt piece"}
     )

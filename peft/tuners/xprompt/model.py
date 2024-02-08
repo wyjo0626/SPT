@@ -199,7 +199,7 @@ class XPromptEmbedding(torch.nn.Module):
         logger.info(f"*** {colorstr('cyan', 'bold', 'pruned')} ***\n{self.to_prune}")
         logger.info(f"*** {colorstr('cyan', 'bold', 'kept')} ***\n{self.kept_prune}\n")
         
-        self._crnt_virtual_tokens = int(self._crnt_virtual_tokens * self.config.token_ratio)
+        self._crnt_virtual_tokens = int(self._crnt_virtual_tokens * round(1.0 - self.config.token_ratio, 5))
     
     def get_profile(self, importance, prefix):
         shp = importance.shape
