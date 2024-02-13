@@ -26,7 +26,7 @@ from transformers.utils import (
     is_safetensors_available,
 )
 from transformers.integrations import deepspeed_load_checkpoint
-from peft import PeftModel, XPromptTuningConfig
+from peft import PeftModel, XPromptTuningConfig, RPromptTuningConfig
 from utils.general import colorstr, colorformat, emojis
 
 logger = logging.getLogger(__name__)
@@ -337,8 +337,9 @@ class TrainCallback(TrainerCallback):
         self.is_eval_training = False
         
         if (isinstance(trainer.model, PeftModel) and 
-            isinstance(trainer.model.active_peft_config, XPromptTuningConfig)):
-            self.xprompt = trainer.model.prompt_encoder[trainer.model.active_adapter]
+            (isinstance(trainer.model.active_peft_config, XPromptTuningConfig) or isinstance(trainer.model.active_peft_config, RPromptTuningConfig))
+            ):
+            self.prune = trainer.model.prompt_encoder[trainer.model.active_adapter]
     
     def on_epoch_end(self, args, state, control, **kwargs):
         if control.should_evaluate and self._trainer.args.eval_training:
@@ -347,8 +348,9 @@ class TrainCallback(TrainerCallback):
             self.is_eval_training = True
             return control_copy
 
-        if hasattr(self, "xprompt"):
-            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
+        if hasattr(self, "prune"):
+            self.prune.estimate_token_importance(self._trainer, state.global_step)
+            self.prune.estimate_piece_importance(self._trainer, state.global_step)
     
     def on_step_end(self, args, state, control, **kwargs):
         if control.should_evaluate and self._trainer.args.eval_training:
@@ -360,18 +362,18 @@ class TrainCallback(TrainerCallback):
         if control.should_evaluate:
             return
         
-        if hasattr(self, "xprompt"):
-            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
-            self.xprompt.estimate_piece_importance(self._trainer, state.global_step)
+        if hasattr(self, "prune"):
+            self.prune.estimate_token_importance(self._trainer, state.global_step)
+            self.prune.estimate_piece_importance(self._trainer, state.global_step)
     
     def on_evaluate(self, args, state, control, **kwargs):
         if self.is_eval_training:
             self.is_eval_training = False
             return
         
-        if not self.is_eval_training and hasattr(self, "xprompt"):
-            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
-            self.xprompt.estimate_piece_importance(self._trainer, state.global_step)
+        if not self.is_eval_training and hasattr(self, "prune"):
+            self.prune.estimate_token_importance(self._trainer, state.global_step)
+            self.prune.estimate_piece_importance(self._trainer, state.global_step)
 
     def on_predict(self, args, state, control, metrics, **kwargs):
         # Save predict result.

@@ -32,6 +32,7 @@ class PeftType(str, enum.Enum):
     RESIDUAL_PROMPT_TUNING = "RESIDUAL_PROMPT_TUNING"
     BITFIT = "BITFIT"
     XPROMPT_TUNING = "XPROMPT_TUNING"
+    RPROMPT_TUNING = "RPROMPT_TUNING"
 
 
 class TaskType(str, enum.Enum):

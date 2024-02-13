@@ -37,6 +37,7 @@ from peft import (
     ResidualPromptTuningConfig,
     BitFitConfig,
     XPromptTuningConfig,
+    RPromptTuningConfig,
 )
 
 AUTO_MODEL = {
@@ -57,6 +58,7 @@ AUTO_PEFT = {
     PeftType.RESIDUAL_PROMPT_TUNING: ResidualPromptTuningConfig,
     PeftType.BITFIT: BitFitConfig,
     PeftType.XPROMPT_TUNING: XPromptTuningConfig,
+    PeftType.RPROMPT_TUNING: RPromptTuningConfig,
 }
 
 logger = logging.getLogger(__name__)

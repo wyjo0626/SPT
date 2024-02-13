@@ -325,7 +325,7 @@ class DynamicPeftArguments:
         },
     ),
     
-    # XPromptTuningConfig
+    # [X/R]PromptTuningConfig
     xprompt_tuning_init: Union[XPromptTuningInit, str] = field(
         default=XPromptTuningInit.RANDOM,
         metadata={"help": "How to initialize the prompt tuning parameters"},
