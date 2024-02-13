@@ -334,38 +334,44 @@ class TrainCallback(TrainerCallback):
     def  __init__(self, trainer) -> None:
         super().__init__()
         self._trainer = trainer
-        self.is_xprompt = False
-        self.is_training_eval = False
+        self.is_eval_training = False
         
         if (isinstance(trainer.model, PeftModel) and 
             isinstance(trainer.model.active_peft_config, XPromptTuningConfig)):
-            self.is_xprompt = True
             self.xprompt = trainer.model.prompt_encoder[trainer.model.active_adapter]
     
     def on_epoch_end(self, args, state, control, **kwargs):
-        if control.should_evaluate:
+        if control.should_evaluate and self._trainer.args.eval_training:
             control_copy = deepcopy(control)
             self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="train")
-            self.is_training_eval = True
+            self.is_eval_training = True
             return control_copy
+
+        if hasattr(self, "xprompt"):
+            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
     
     def on_step_end(self, args, state, control, **kwargs):
-        if control.should_evaluate:
+        if control.should_evaluate and self._trainer.args.eval_training:
             control_copy = deepcopy(control)
             self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="train")
-            self.is_training_eval = True
+            self.is_eval_training = True
             return control_copy
-        
-        if self.is_xprompt:
-            self.xprompt.estimate_token_importance(self._trainer, args.max_steps, state.global_step)
-    
-    def on_evaluate(self, args, state, control, **kwargs):
-        if self.is_training_eval:
-            self.is_training_eval = False
+
+        if control.should_evaluate:
             return
         
-        if not self.is_training_eval and self.is_xprompt:
-            self.xprompt.estimate_token_importance(self._trainer, args.max_steps, state.global_step)
+        if hasattr(self, "xprompt"):
+            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
+            self.xprompt.estimate_piece_importance(self._trainer, state.global_step)
+    
+    def on_evaluate(self, args, state, control, **kwargs):
+        if self.is_eval_training:
+            self.is_eval_training = False
+            return
+        
+        if not self.is_eval_training and hasattr(self, "xprompt"):
+            self.xprompt.estimate_token_importance(self._trainer, state.global_step)
+            self.xprompt.estimate_piece_importance(self._trainer, state.global_step)
 
     def on_predict(self, args, state, control, metrics, **kwargs):
         # Save predict result.

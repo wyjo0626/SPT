@@ -37,7 +37,7 @@ def pearson_corrcoef(predictions, labels)-> dict:
 
 
 def spearman_corrcoef(predictions, labels) -> dict:
-    labels = [string_to_float(labels) for label in labels]
+    labels = [string_to_float(label) for label in labels]
     predictions = [string_to_float(prediction) for prediction in predictions]
     spearman_corrcoef = 100 * scipy.stats.spearmanr(labels, predictions)[0]
     

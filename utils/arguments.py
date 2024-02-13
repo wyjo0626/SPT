@@ -181,6 +181,10 @@ class ModelArguments:
 
 @dataclass
 class DynamicTrainingArguments(Seq2SeqTrainingArguments):
+    eval_training: bool = field(
+        default=False,
+        metadata={"help": "Whether to evaluate the train dataset."}
+    )
     predict_with_generate: bool = field(
         default=True,
         metadata={"help": "Whether to use generate to get the predictions."}
@@ -323,7 +327,7 @@ class DynamicPeftArguments:
     
     # XPromptTuningConfig
     xprompt_tuning_init: Union[XPromptTuningInit, str] = field(
-        default=PromptTuningInit.RANDOM,
+        default=XPromptTuningInit.RANDOM,
         metadata={"help": "How to initialize the prompt tuning parameters"},
     )
     xprompt_tuning_init_text: Optional[str] = field(
@@ -347,11 +351,15 @@ class DynamicPeftArguments:
             ),
         },
     )
-    prune_steps: int = field(
-        default=3,
+    prune_step: int = field(
+        default=15000,
         metadata={
-            "help": "Pruning as much as steps during training"
+            "help": "Pruning is performed at this step, followed by rewinding in the remaining step"
         }
+    )
+    token_pieces: int = field(
+        default=16,
+        metadata={"help": "Separate the embedding vector in k pieces"}
     )
     token_ratio: float = field(
         default=0.5,
@@ -360,10 +368,6 @@ class DynamicPeftArguments:
     piece_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt piece"}
-    )
-    token_piece: int = field(
-        default=16,
-        metadata={"help": "Separate the embedding vector in k pieces"}
     )
 
 

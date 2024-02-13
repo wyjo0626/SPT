@@ -68,25 +68,25 @@ class XPromptEmbedding(torch.nn.Module):
     def __init__(self, config, word_embeddings):
         super().__init__()
         
-        self.config = config
-        
-        self._crnt_virtual_tokens = config.num_virtual_tokens
-        self.embedding = torch.nn.Embedding(self.orig_total_virtual_tokens, config.token_dim)
-        self.token_mask = torch.ones(self.orig_total_virtual_tokens)
-        # self.piece_mask = torch.nn.ones()
+        total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
+        self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
+        self.token_mask = torch.ones(total_virtual_tokens)
+        self.piece_mask = torch.ones(total_virtual_tokens, config.token_dim)
+        if config.token_dim % config.token_pieces > 0:
+            raise ValueError("The number of token_pieces for the token dimension does not perfectly divide.")
         
         self.to_prune = {
             self.token_prefix: set(), 
-            # "piece-level": set(),
-            }
+            self.piece_prefix: {}
+        }
         self.kept_prune = {
-            self.token_prefix: set(range(self.orig_total_virtual_tokens)), 
-            # "piece-level": set(),
+            self.token_prefix: set(range(total_virtual_tokens)), 
+            self.piece_prefix: {
+                f"{self.token_prefix}:{token}": set(range(config.token_pieces)) 
+                for token in range(total_virtual_tokens)
+            }
         }
         
-        # prune steps and rewinding step.
-        self.total_steps = config.prune_steps + 1
-        self.crnt_prune_step = 0
         
         if config.xprompt_tuning_init == XPromptTuningInit.TEXT:
             from transformers import AutoTokenizer
@@ -97,21 +97,24 @@ class XPromptEmbedding(torch.nn.Module):
             init_token_ids = tokenizer(init_text)["input_ids"]
             # Trim or iterate until num_text_tokens matches total_virtual_tokens
             num_text_tokens = len(init_token_ids)
-            if num_text_tokens > self.orig_total_virtual_tokens:
-                init_token_ids = init_token_ids[:self.orig_total_virtual_tokens]
-            elif num_text_tokens < self.orig_total_virtual_tokens:
-                num_reps = math.ceil(self.orig_total_virtual_tokens / num_text_tokens)
+            if num_text_tokens > total_virtual_tokens:
+                init_token_ids = init_token_ids[:total_virtual_tokens]
+            elif num_text_tokens < total_virtual_tokens:
+                num_reps = math.ceil(total_virtual_tokens / num_text_tokens)
                 init_token_ids = init_token_ids * num_reps
-            init_token_ids = init_token_ids[:self.orig_total_virtual_tokens]
+            init_token_ids = init_token_ids[:total_virtual_tokens]
             init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
 
             word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
             word_embedding_weights = word_embedding_weights.to(torch.float32)
             self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
+        
+        self.config = config
+        self.total_virtual_tokens = total_virtual_tokens
     
     def forward(self, indices):
         # Just get embeddings
-        prompt_embeddings = self.embedding(indices)[:, list(self.kept_prune[self.token_prefix]), :]
+        prompt_embeddings = self.embedding(indices) * self.piece_mask.to(indices.device)
         return prompt_embeddings
 
     def batch_token_importance(self):
@@ -124,7 +127,7 @@ class XPromptEmbedding(torch.nn.Module):
         
         # Take the absolute dot
         importance = torch.einsum(
-            "lv,lv->l",
+            "ew,ew->e",
             [embed, d_embed],
         )
         
@@ -132,33 +135,43 @@ class XPromptEmbedding(torch.nn.Module):
         importance = importance.abs().detach()
         
         return importance, mask
+    
+    def batch_piece_importance(self):
+        split_size = self.config.token_dim // self.config.token_pieces
+        split_embed = torch.split(self.embedding.weight, split_size, dim=1)
+        split_d_embed = torch.split(self.embedding.weight.grad, split_size, dim=1)
+        mask = self.piece_mask[:, torch.arange(self.config.token_dim) % split_size == 0].to(
+            self.embedding.weight.device
+        )
+        
+        importance = torch.stack(
+            [torch.einsum("li,li->l", piece, grad) 
+             for piece, grad in zip(split_embed, split_d_embed)], dim=1
+        )
+        
+        importance *= mask
+        importance = importance.abs().detach()
+        
+        return importance, mask
 
-    def estimate_token_importance(self, trainer, total_steps, crnt_steps):
+    def estimate_token_importance(self, trainer, current_step):
         """Train the model for one epoch to prune the negative token"""
-        prune_steps = total_steps // self.total_steps
-        self.crnt_prune_step = crnt_steps // prune_steps
-        # only prune the token in prune steps, not 0 and total steps (rewinding steps)
-        if (crnt_steps % prune_steps != 0 or 
-            self.crnt_prune_step == 0 or
-            self.crnt_prune_step == self.total_steps):
+        
+        # only prune the token in target step.
+        if current_step != self.config.prune_step:
             return
         
         logger.info(f"*** {colorstr('cyan', 'bold', 'Pruning Tokens')} ***")
         
         model = trainer.model
-        device = self.embedding.weight.device
         is_training = model.training
+        device = self.embedding.weight.device
         
         model.eval()
         trainer.optimizer.zero_grad()
         
-        # piece_mask = torch.ones(total_virtual_tokens).to(device)
-        embed_importance = {
-            self.token_prefix: torch.zeros(self.orig_total_virtual_tokens).to(device)
-            # "piece-level": torch.zeros(total_virtual_tokens).to(device)
-        }
-        denoms = {attn_type: val.clone() for attn_type, val in embed_importance.items()}
-        profile = {}
+        embed_importance = torch.zeros(self.total_virtual_tokens).to(device)
+        denoms = embed_importance.clone()
         
         for idx, data in enumerate(trainer.get_train_dataloader()):
             input_ids = data["input_ids"]
@@ -176,67 +189,120 @@ class XPromptEmbedding(torch.nn.Module):
             
             importance, denom = self.batch_token_importance() 
             
-            embed_importance[self.token_prefix] += importance
-            denoms[self.token_prefix] += denom
+            embed_importance += importance
+            denoms += denom
         
         if is_training:
             model.train()
         
-        # Normalize
-        embed_importance[self.token_prefix] /= denoms[self.token_prefix]
-        profile[self.token_prefix] = self.get_profile(embed_importance[self.token_prefix], self.token_prefix)
+        # token Normalize
+        embed_importance /= denoms
+        profile = self.token_profile(embed_importance)
         
         # prune the tokens
-        for desc in profile[self.token_prefix]:
-            idx = int(desc[0].split(":")[1])
+        for desc, _ in profile:
+            idx = int(desc.split(":")[1])
             self.to_prune[self.token_prefix].add(idx)
             self.kept_prune[self.token_prefix].remove(idx)
+            self.to_prune[self.piece_prefix][desc] = self.kept_prune[self.piece_prefix].pop(desc)
             self.token_mask[idx] = 0
+            self.piece_mask[idx] = 0
         
         logger.info(f"*** {colorstr('cyan', 'bold', 'token importance scores')} to be removed ***\n"
-                    f"{list(f'{token[1].item():.5f}' for token in profile[self.token_prefix])}\n"
-                    f"{list(token for token, _ in profile[self.token_prefix])}\n")
-        logger.info(f"*** {colorstr('cyan', 'bold', 'pruned')} ***\n{self.to_prune}")
-        logger.info(f"*** {colorstr('cyan', 'bold', 'kept')} ***\n{self.kept_prune}\n")
-        
-        self._crnt_virtual_tokens = int(self._crnt_virtual_tokens * round(1.0 - self.config.token_ratio, 5))
+                    f"{list(f'{token[1].item():.5f}' for token in profile)}\n"
+                    f"{list(token for token, _ in profile)}\n")
+        logger.info(f"*** {colorstr('cyan', 'bold', 'pruned')} ***\n{self.to_prune[self.token_prefix]}")
+        logger.info(f"*** {colorstr('cyan', 'bold', 'kept')} ***\n{self.kept_prune[self.token_prefix]}\n")
+        logger.info(f"*** {colorstr('cyan', 'bold', 'token mask')} ***\n{self.token_mask}")
     
-    def get_profile(self, importance, prefix):
-        shp = importance.shape
+    def estimate_piece_importance(self, trainer, current_step):
+        """Train the model for one epoch to prune the negative token"""
         
-        # target token length
-        target_token_length = int(self.crnt_total_virtual_tokens * self.config.token_ratio)
+        # only prune the token in target step.
+        if current_step != self.config.prune_step:
+            return
         
-        if len(shp) == 1:
-            # token profile
-            num_token = shp[0]
+        logger.info(f"*** {colorstr('cyan', 'bold', 'Pruning Pieces')} ***")
         
-            # create profile
-            profile = {
-                f"{prefix}:{token}": importance[token]
-                for token in range(num_token)
-            }
-            # select kept tokens
-            profile = {k: v for k ,v in profile.items() if int(k.split(":")[1]) in self.kept_prune[self.token_prefix]}
-            # sort tokens
-            profile = sorted(profile.items(), key=lambda x: x[1])[:target_token_length]
-        else:
-            # piece profile
-            None
+        model = trainer.model
+        is_training = model.training
+        device = self.embedding.weight.device
+        
+        model.eval()
+        trainer.optimizer.zero_grad()
+        
+        embed_importance = torch.zeros(self.total_virtual_tokens, self.config.token_pieces).to(device)
+        denoms = embed_importance.clone()
+        
+        for idx, data in enumerate(trainer.get_train_dataloader()):
+            input_ids = data["input_ids"]
+            attention_mask = data["attention_mask"]
+            labels = data["labels"]
+            
+            output = model.forward(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+            )
+            
+            self.embedding.weight.retain_grad()
+            output.loss.backward()
+            
+            importance, denom = self.batch_piece_importance() 
+            
+            embed_importance += importance
+            denoms += denom
+        
+        if is_training:
+            model.train()
+        
+        # piece Normalize
+        embed_importance /= denoms
+        profile = self.piece_profile(embed_importance)
+        
+        # prune the pieces
+        split_size = self.config.token_dim // self.config.token_pieces
+        for token, _ in profile.items():
+            if self.to_prune[self.piece_prefix].get(token) is None: self.to_prune[self.piece_prefix][token] = set()
+            for desc, _ in profile[token]:
+                idx = int(desc.split(":")[1])
+                self.to_prune[self.piece_prefix][token].add(idx)
+                self.kept_prune[self.piece_prefix][token].remove(idx)
+                self.piece_mask[int(token.split(":")[1])][idx*split_size:(idx+1)*split_size] = 0
+        
+        logger.info(f"*** {colorstr('cyan', 'bold', 'piece importance scores')} to be removed ***\n")
+        logger.info(f"*** {colorstr('cyan', 'bold', 'pruned')} ***\n{self.to_prune[self.piece_prefix]}")
+        logger.info(f"*** {colorstr('cyan', 'bold', 'kept')} ***\n{self.kept_prune[self.piece_prefix]}\n")
+    
+    def token_profile(self, importance):
+        target_token_length = int(self.total_virtual_tokens * self.config.token_ratio)
+        
+        # create profile
+        profile = {
+            f"{self.token_prefix}:{token}": importance[token]
+            for token in range(len(importance))
+        }
+        # select kept tokens
+        profile = {k: v for k, v in profile.items() if int(k.split(":")[1]) in self.kept_prune[self.token_prefix]}
+        # sort tokens
+        profile = sorted(profile.items(), key=lambda x: x[1])[:target_token_length]
         
         return profile
-    
-    @property
-    def crnt_total_virtual_tokens(self):
-        # get (ininitalized or pruned) virtual token length
-        return self._crnt_virtual_tokens * self.config.num_transformer_submodules
 
-    @property
-    def crnt_virtual_tokens(self):
-        # get current virtual token length
-        return self._crnt_virtual_tokens
-
-    @property
-    def orig_total_virtual_tokens(self):
-        # get original virtual token length
-        return self.confiug.num_virtual_tokens * self.config.num_transformer_submodules
+    def piece_profile(self, importance):
+        target_piece_length = int(self.config.token_pieces * self.config.piece_ratio)
+        
+        # create profile
+        profile = {
+            f"{self.token_prefix}:{token}": {
+                f"{self.piece_prefix}:{piece}": importance[token][piece]
+                for piece in range(len(importance[token]))
+            }
+            for token in range(len(importance))
+        }
+        # select kept tokens
+        profile = {k: v for k, v in profile.items() if int (k.split(":")[1]) in self.kept_prune[self.token_prefix]}
+        for k, v in profile.items():
+            profile[k] = sorted(profile[k].items(), key=lambda x: x[1])[:target_piece_length]
+        
+        return profile

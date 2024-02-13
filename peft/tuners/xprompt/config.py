@@ -65,23 +65,23 @@ class XPromptTuningConfig(PromptLearningConfig):
             ),
         },
     )
-    prune_steps: int = field(
-        default=3,
+    prune_step: int = field(
+        default=15000,
         metadata={
-            "help": "Pruning as much as steps during training"
+            "help": "Pruning is performed at this step, followed by rewinding in the remaining step"
         }
     )
-    token_ratio: int = field(
+    token_pieces: int = field(
+        default=16,
+        metadata={"help": "Separate the embedding vector in k pieces"}
+    )
+    token_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt tokens"}
     )
-    piece_ratio: int = field(
+    piece_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt piece"}
-    )
-    token_piece: int = field(
-        default=16,
-        metadata={"help": "Separate the embedding vector in k pieces"}
     )
 
     def __post_init__(self):

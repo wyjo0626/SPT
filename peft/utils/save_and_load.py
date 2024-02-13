@@ -94,7 +94,6 @@ def get_peft_model_state_dict(
     elif config.peft_type == PeftType.ADAPTION_PROMPT:
         to_return = {k: state_dict[k] for k in state_dict if k.split(".")[-1].startswith("adaption_")}
     
-    
     elif config.is_prompt_learning:
         to_return = {}
         
@@ -105,9 +104,10 @@ def get_peft_model_state_dict(
         to_return["prompt_embeddings"] = prompt_embeddings
         
         if config.peft_type == PeftType.XPROMPT_TUNING:
-            to_return["to_prune"] = model.prompt_encoder[adapter_name].to_prune
-            to_return["kept_prune"] = model.prompt_encoder[adapter_name].kept_prune
+            # to_return["to_prune"] = model.prompt_encoder[adapter_name].to_prune
+            # to_return["kept_prune"] = model.prompt_encoder[adapter_name].kept_prune
             to_return["token_mask"] = model.prompt_encoder[adapter_name].token_mask
+            to_return["piece_mask"] = model.prompt_encoder[adapter_name].piece_mask
     else:
         raise NotImplementedError
     
@@ -201,9 +201,10 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
         )
         
         if config.peft_type == PeftType.XPROMPT_TUNING:
-            model.prompt_encoder[adapter_name].to_prune = peft_model_state_dict["to_prune"]
-            model.prompt_encoder[adapter_name].kept_prune = peft_model_state_dict["kept_prune"]
+            # model.prompt_encoder[adapter_name].to_prune = peft_model_state_dict["to_prune"]
+            # model.prompt_encoder[adapter_name].kept_prune = peft_model_state_dict["kept_prune"]
             model.prompt_encoder[adapter_name].token_mask = peft_model_state_dict["token_mask"]
+            model.prompt_encoder[adapter_name].piece_mask = peft_model_state_dict["piece_mask"]
     
     return load_result
 
