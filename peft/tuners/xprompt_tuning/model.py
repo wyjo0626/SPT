@@ -88,7 +88,7 @@ class XPromptEmbedding(torch.nn.Module):
         }
         
         
-        if config.xprompt_tuning_init == XPromptTuningInit.TEXT:
+        if config.xprompt_tuning_init == XPromptTuningInit.TEXT and not config.inference_mode:
             from transformers import AutoTokenizer
 
             tokenizer_kwargs = config.tokenizer_kwargs or {}
