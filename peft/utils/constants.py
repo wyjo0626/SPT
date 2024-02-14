@@ -168,3 +168,5 @@ SAFETENSORS_WEIGHTS_NAME = "adapter_model.safetensors"
 CONFIG_NAME = "adapter_config.json"
 EMBEDDING_LAYER_NAMES = ["embed_tokens", "lm_head"]
 INCLUDE_LINEAR_LAYERS_SHORTHAND = "all-linear"
+PROMPT_PRUNED = "prompt_pruned.json"
+PROMPT_KEPT = "prompt_kept.json"

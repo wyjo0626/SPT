@@ -84,7 +84,6 @@ class RPromptEmbedding(torch.nn.Module):
             self.piece_prefix: {}
         }
         
-        
         if config.rprompt_tuning_init == RPromptTuningInit.TEXT:
             from transformers import AutoTokenizer
 
@@ -196,7 +195,7 @@ class RPromptEmbedding(torch.nn.Module):
         # token Normalize
         embed_importance /= denoms
         profile = self.token_profile(embed_importance)
-        target_token_length = int(self.total_virtual_tokens * self.config.token_ratio)
+        target_token_length = int(self.total_virtual_tokens * round(1 - self.config.token_ratio, 5))
         
         # prune the tokens
         for desc, _ in profile:

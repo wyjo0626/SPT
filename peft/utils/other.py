@@ -37,6 +37,8 @@ from .constants import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
     TRANSFORMERS_MODELS_TO_BITFIT_BIAS_MODULES_MAPPING,
     WEIGHTS_NAME,
+    PROMPT_PRUNED,
+    PROMPT_KEPT,
     bloom_model_postprocess_past_key_value,
     starcoder_model_postprocess_past_key_value,
 )
@@ -387,6 +389,14 @@ def transpose(weight, fan_in_fan_out):
     if isinstance(weight, torch.nn.Parameter):
         return torch.nn.Parameter(weight.T)
     return weight.T
+
+
+def prepare_for_json(d):
+    for k, v in d.items():
+        if isinstance(v, set):
+            d[k] = list(v)
+        elif isinstance(v, dict):
+            prepare_for_json(v)
 
 
 def _is_valid_match(key: str, target_key: str):

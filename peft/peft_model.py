@@ -19,6 +19,7 @@ import collections
 import inspect
 import os
 import warnings
+import json
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
@@ -52,6 +53,8 @@ from .utils import (
     SAFETENSORS_WEIGHTS_NAME,
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
     WEIGHTS_NAME,
+    PROMPT_PRUNED,
+    PROMPT_KEPT,
     PeftType,
     TaskType,
     _get_batch_size,
@@ -64,6 +67,7 @@ from .utils import (
     load_peft_weights,
     set_peft_model_state_dict,
     shift_tokens_right,
+    prepare_for_json
 )
 
 
@@ -217,6 +221,23 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             )
             output_dir = os.path.join(save_directory, adapter_name) if adapter_name != "default" else save_directory
             os.makedirs(output_dir, exist_ok=True)
+            
+            if peft_config.peft_type in [
+                PeftType.XPROMPT_TUNING,
+                PeftType.RPROMPT_TUNING,
+            ]:
+                with open(os.path.join(output_dir, PROMPT_PRUNED), 'w') as prompt_pruned:
+                    prepare_for_json(self.prompt_encoder[adapter_name].to_prune)
+                    json.dump(
+                        self.prompt_encoder[adapter_name].to_prune, 
+                        prompt_pruned
+                    )
+                with open(os.path.join(output_dir, PROMPT_KEPT), 'w') as prompt_kept:
+                    prepare_for_json(self.prompt_encoder[adapter_name].kept_prune)
+                    json.dump(
+                        self.prompt_encoder[adapter_name].kept_prune, 
+                        prompt_kept
+                    )
 
             if is_main_process and safe_serialization:
                 # Section copied from: https://github.com/huggingface/transformers/blob/main/src/transformers/modeling_utils.py#L2111-L2134
@@ -444,7 +465,10 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         if self.peft_config[adapter_name].peft_type == PeftType.PREFIX_TUNING:
             prompt_tokens = prompt_tokens[:, : self.peft_config[adapter_name].num_virtual_tokens]
 
-        prompt_embeddings = prompt_encoder(prompt_tokens)
+        if self.peft_config[adapter_name].peft_type == PeftType.RPROMPT_TUNING:
+            prompt_embeddings = prompt_encoder.embedding(prompt_tokens)
+        else:
+            prompt_embeddings = prompt_encoder(prompt_tokens)
 
         return prompt_embeddings[0].detach().cpu()
     
@@ -713,6 +737,16 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
         # load the weights into the model
         load_result = set_peft_model_state_dict(self, adapters_weights, adapter_name=adapter_name)
+        
+        if self.peft_config[adapter_name].peft_type in [
+            PeftType.XPROMPT_TUNING,
+            PeftType.RPROMPT_TUNING
+        ]:
+            with open(os.path.join(model_id, PROMPT_PRUNED), 'r') as prompt_pruned:
+                self.prompt_encoder[adapter_name].to_prune = json.load(prompt_pruned)
+            with open(os.path.join(model_id, PROMPT_KEPT), 'r') as prompt_kept:
+                self.prompt_encoder[adapter_name].kept_prune = json.load(prompt_kept)
+        
         if (
             (getattr(self, "hf_device_map", None) is not None)
             and (len(set(self.hf_device_map.values()).intersection({"cpu", "disk"})) > 0)
@@ -1190,8 +1224,8 @@ class PeftModelForCausalLM(PeftModel):
         if peft_config.is_prompt_learning:
             if model_kwargs.get("attention_mask", None) is not None:
                 if peft_config.peft_type in [
-                PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                    PeftType.XPROMPT_TUNING,
+                    PeftType.RPROMPT_TUNING
                 ]:
                     prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(
                         model_kwargs["input_ids"].shape[0], -1
@@ -1790,9 +1824,9 @@ class PeftModelForQuestionAnswering(PeftModel):
         if attention_mask is not None:
             # concat prompt attention mask
             if peft_config.peft_type in [
-                    PeftType.XPROMPT_TUNING,
-                    PeftType.RPROMPT_TUNING
-                ]:
+                PeftType.XPROMPT_TUNING,
+                PeftType.RPROMPT_TUNING
+            ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
                 prefix_attention_mask = torch.ones(batch_size, peft_config.num_virtual_tokens).to(attention_mask.device)
@@ -1964,9 +1998,9 @@ class PeftModelForFeatureExtraction(PeftModel):
         if attention_mask is not None:
             # concat prompt attention mask
             if peft_config.peft_type in [
-                    PeftType.XPROMPT_TUNING,
-                    PeftType.RPROMPT_TUNING
-                ]:
+                PeftType.XPROMPT_TUNING,
+                PeftType.RPROMPT_TUNING
+            ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
                 prefix_attention_mask = torch.ones(batch_size, peft_config.num_virtual_tokens).to(attention_mask.device)
