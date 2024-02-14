@@ -147,7 +147,7 @@ class ResidualPromptEmbedding(torch.nn.Module):
         self.total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
         self.embedding = torch.nn.Embedding(self.total_virtual_tokens, config.token_dim)
         
-        if config.residual_prompt_tuning_init == ResidualPromptTuningInit.TEXT:
+        if config.residual_prompt_tuning_init == ResidualPromptTuningInit.TEXT and not config.inference_mode:
             from transformers import AutoTokenizer
             
             tokenizer_kwargs = config.tokenizer_kwargs or {}
@@ -168,13 +168,14 @@ class ResidualPromptEmbedding(torch.nn.Module):
             word_embedding_weights = word_embedding_weights.to(torch.float32)
             self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
         
-        if self.separate:
-            self.mlp = {}
-            self.mlp = torch.nn.ModuleDict()
-            for i in range(self.total_virtual_tokens):
-                self.mlp[str(i)] = ResidualMLP(config)
-        else:
-            self.mlp = ResidualMLP(config)
+        if not config.inference_mode:
+            if self.separate:
+                self.mlp = {}
+                self.mlp = torch.nn.ModuleDict()
+                for i in range(self.total_virtual_tokens):
+                    self.mlp[str(i)] = ResidualMLP(config)
+            else:
+                self.mlp = ResidualMLP(config)
     
     def forward(self, indices):
         # Just get embeddings

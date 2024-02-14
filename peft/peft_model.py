@@ -477,6 +477,9 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         else:
             prompt_embeddings = prompt_encoder(prompt_tokens)
 
+        if self.peft_config[adapter_name].peft_type == PeftType.RESIDUAL_PROMPT_TUNING:
+            prompt_embeddings = prompt_embeddings.unsqueeze(0).expand(1, -1, -1)
+
         return prompt_embeddings[0].detach().cpu()
     
     def get_prompt(self, batch_size: int, task_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
