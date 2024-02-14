@@ -48,6 +48,7 @@ from .tuners import (
     BitFitModel,
     XPromptEmbedding,
     RPromptEmbedding,
+    CPromptEmbedding,
 )
 from .utils import (
     SAFETENSORS_WEIGHTS_NAME,
@@ -82,6 +83,7 @@ PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.BITFIT: BitFitModel,
     PeftType.XPROMPT_TUNING: XPromptEmbedding,
     PeftType.RPROMPT_TUNING: RPromptEmbedding,
+    PeftType.CPROMPT_TUNING: CPromptEmbedding,
 }
 
 
@@ -418,6 +420,8 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             prompt_encoder = XPromptEmbedding(config, self.word_embeddings)
         elif config.peft_type == PeftType.RPROMPT_TUNING:
             prompt_encoder = RPromptEmbedding(config, self.word_embeddings)
+        elif config.peft_type == PeftType.CPROMPT_TUNING:
+            prompt_encoder = CPromptEmbedding(config, self.word_embeddings)
         else:
             raise ValueError("Not supported")
 
@@ -465,7 +469,10 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         if self.peft_config[adapter_name].peft_type == PeftType.PREFIX_TUNING:
             prompt_tokens = prompt_tokens[:, : self.peft_config[adapter_name].num_virtual_tokens]
 
-        if self.peft_config[adapter_name].peft_type == PeftType.RPROMPT_TUNING:
+        if self.peft_config[adapter_name].peft_type in [
+            PeftType.RPROMPT_TUNING,
+            PeftType.CPROMPT_TUNING,
+        ]:
             prompt_embeddings = prompt_encoder.embedding(prompt_tokens)
         else:
             prompt_embeddings = prompt_encoder(prompt_tokens)
@@ -955,7 +962,8 @@ class PeftModelForSequenceClassification(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
@@ -1159,7 +1167,8 @@ class PeftModelForCausalLM(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
@@ -1225,7 +1234,8 @@ class PeftModelForCausalLM(PeftModel):
             if model_kwargs.get("attention_mask", None) is not None:
                 if peft_config.peft_type in [
                     PeftType.XPROMPT_TUNING,
-                    PeftType.RPROMPT_TUNING
+                    PeftType.RPROMPT_TUNING,
+                    PeftType.CPROMPT_TUNING,
                 ]:
                     prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(
                         model_kwargs["input_ids"].shape[0], -1
@@ -1341,7 +1351,8 @@ class PeftModelForSeq2SeqLM(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(
                     decoder_attention_mask.device
@@ -1357,6 +1368,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
                 PeftType.RESIDUAL_PROMPT_TUNING,
                 PeftType.XPROMPT_TUNING,
                 PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 decoder_attention_mask = torch.cat((prefix_attention_mask, decoder_attention_mask), dim=1)
 
@@ -1392,6 +1404,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
             PeftType.RESIDUAL_PROMPT_TUNING,
             PeftType.XPROMPT_TUNING,
             PeftType.RPROMPT_TUNING,
+            PeftType.CPROMPT_TUNING,
         ]:
             if inputs_embeds is None:
                 inputs_embeds = self.word_embeddings(input_ids)
@@ -1400,7 +1413,8 @@ class PeftModelForSeq2SeqLM(PeftModel):
                 # concat prompt attention mask
                 if peft_config.peft_type in [
                     PeftType.XPROMPT_TUNING,
-                    PeftType.RPROMPT_TUNING
+                    PeftType.RPROMPT_TUNING,
+                    PeftType.CPROMPT_TUNING,
                 ]:
                     prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(
                         attention_mask.device
@@ -1434,7 +1448,8 @@ class PeftModelForSeq2SeqLM(PeftModel):
                 # concat prompt attention mask
                 if peft_config.peft_type in [
                     PeftType.XPROMPT_TUNING,
-                    PeftType.RPROMPT_TUNING
+                    PeftType.RPROMPT_TUNING,
+                    PeftType.CPROMPT_TUNING,
                 ]:
                     prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(
                         attention_mask.device
@@ -1501,6 +1516,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
                     PeftType.RESIDUAL_PROMPT_TUNING,
                     PeftType.XPROMPT_TUNING,
                     PeftType.RPROMPT_TUNING,
+                    PeftType.CPROMPT_TUNING,
                 ]:
                     kwargs = deepcopy(kwargs)
                     
@@ -1522,7 +1538,8 @@ class PeftModelForSeq2SeqLM(PeftModel):
                     if "attention_mask" in kwargs:
                         if peft_config.peft_type in [
                             PeftType.XPROMPT_TUNING,
-                            PeftType.RPROMPT_TUNING
+                            PeftType.RPROMPT_TUNING,
+                            PeftType.CPROMPT_TUNING,
                         ]:
                             prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(
                                 kwargs["attention_mask"].device
@@ -1646,7 +1663,8 @@ class PeftModelForTokenClassification(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
@@ -1825,7 +1843,8 @@ class PeftModelForQuestionAnswering(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:
@@ -1999,7 +2018,8 @@ class PeftModelForFeatureExtraction(PeftModel):
             # concat prompt attention mask
             if peft_config.peft_type in [
                 PeftType.XPROMPT_TUNING,
-                PeftType.RPROMPT_TUNING
+                PeftType.RPROMPT_TUNING,
+                PeftType.CPROMPT_TUNING,
             ]:
                 prefix_attention_mask = self.prompt_encoder[self.active_adapter].token_mask.expand(batch_size, -1).to(attention_mask.device)
             else:

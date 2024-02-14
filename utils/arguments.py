@@ -9,6 +9,8 @@ from peft import (
     PeftType, 
     PromptTuningInit,
     XPromptTuningInit, 
+    CPromptTuningInit,
+    CPromptTuningActivation,
     LoftQConfig, 
     PromptEncoderReparameterizationType, 
     ResidualPromptTuningInit,
@@ -368,6 +370,64 @@ class DynamicPeftArguments:
     piece_ratio: float = field(
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt piece"}
+    )
+    # CPromptTuningConfig
+    prompt_tuning_init: Union[CPromptTuningInit, str] = field(
+        default=CPromptTuningInit.RANDOM,
+        metadata={"help": "How to initialize the prompt tuning parameters"},
+    )
+    prompt_tuning_init_text: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
+        },
+    )
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
+        },
+    )
+    
+    tokenizer_kwargs: Optional[dict] = field(
+        default=None,
+        metadata={
+            "help": (
+                "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is "
+                "`TEXT`"
+            ),
+        },
+    )
+    
+    output_embeddings: Optional[int] = field(
+        default=10,
+        metadata={
+            "help": "The output channel arguments to use for nn.Conv1d initialization."
+        }
+    )
+    nonlinearity: Union[CPromptTuningActivation, str] = field(
+        default=CPromptTuningActivation.RELU,
+        metadata={
+            "help": "The type of activation function."
+        }
+    )
+    layer_norm: bool = field(
+        default=True,
+        metadata={
+            "help": "Set this the False if you don't use layer normalization"
+        }
+    )
+    dropout: float = field(
+        default=0.1,
+        metadata={
+            "help": "Set this 0.0 if you don't use dropout"
+        }
+    )
+    bottleneck: int = field(
+        default=384,
+        metadata={
+            "help": "The type of bottleneck size."
+        }
     )
 
 

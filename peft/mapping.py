@@ -42,6 +42,7 @@ from .tuners import (
     BitFitModel,
     XPromptTuningConfig,
     RPromptTuningConfig,
+    CPromptTuningConfig,
 )
 from .utils import _prepare_prompt_learning_config
 
@@ -70,6 +71,7 @@ PEFT_TYPE_TO_CONFIG_MAPPING: Dict[str, PeftConfig] = {
     "BITFIT": BitFitConfig,
     "XPROMPT_TUNING": XPromptTuningConfig,
     "RPROMPT_TUNING": RPromptTuningConfig,
+    "CPROMPT_TUNING": CPromptTuningConfig,
 }
 
 PEFT_TYPE_TO_TUNER_MAPPING = {

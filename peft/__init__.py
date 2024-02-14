@@ -60,6 +60,10 @@ from .tuners import (
     RPromptTuningConfig,
     RPromptTuningInit,
     RPromptEmbedding,
+    CPromptTuningConfig,
+    CPromptTuningInit,
+    CPromptTuningActivation,
+    CPromptEmbedding,
 )
 from .utils import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
