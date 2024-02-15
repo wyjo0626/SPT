@@ -348,6 +348,9 @@ class TrainCallback(TrainerCallback):
             self.is_eval_training = True
             return control_copy
 
+        if control.should_evaluate:
+            return
+
         if hasattr(self, "prune"):
             self.prune.estimate_token_importance(self._trainer, state.global_step)
             self.prune.estimate_piece_importance(self._trainer, state.global_step)
