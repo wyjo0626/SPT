@@ -61,9 +61,17 @@ class CPromptEmbedding(nn.Module):
         super().__init__()
         
         total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
-        self.embedding = nn.Embedding(total_virtual_tokens, config.token_dim)
+        
+        if config.inference_mode:
+            self.reduced_embedding = torch.nn.Embedding(config.output_embeddings, config.token_dim)
+        else:
+            self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
+        
         self.token_mask = torch.ones(config.output_embeddings)
-        if config.prompt_tuning_init == CPromptTuningInit.TEXT:
+        self.total_virtual_tokens = total_virtual_tokens
+        self.config = config
+        
+        if config.prompt_tuning_init == CPromptTuningInit.TEXT and not config.inference_mode:
             from transformers import AutoTokenizer
 
             tokenizer_kwargs = config.tokenizer_kwargs or {}
@@ -84,34 +92,38 @@ class CPromptEmbedding(nn.Module):
             word_embedding_weights = word_embedding_weights.to(torch.float32)
             self.embedding.weight = nn.Parameter(word_embedding_weights)
         
-        self.conv = nn.Conv1d(
-            in_channels=total_virtual_tokens, 
-            out_channels=config.output_embeddings,
-            kernel_size=1,
-            stride=1,
-            bias=True,
-        )
-        
-        layers = [nn.Linear(config.token_dim, config.bottleneck)]
-        
-        if config.nonlinearity == CPromptTuningActivation.RELU:
-            layers.append(nn.ReLU())
-        elif config.nonlinearity == CPromptTuningActivation.TANH:
-            layers.append(nn.Tanh())
-        elif config.nonlinearity == CPromptTuningActivation.SIGM:
-            layers.append(nn.Sigmoid())
-        
-        layers.append(nn.Linear(config.bottleneck, config.token_dim))
-        
-        if config.dropout > 0:
-            layers.append(nn.Dropout(p=config.dropout))
-        if config.layer_norm:
-            layers.append(nn.LayerNorm(config.token_dim))
-        
-        self.module = nn.Sequential(*layers)
+        if not config.inference_mode:
+            self.conv = nn.Conv1d(
+                in_channels=total_virtual_tokens, 
+                out_channels=config.output_embeddings,
+                kernel_size=1,
+                stride=1,
+                bias=True,
+            )
+            
+            layers = [nn.Linear(config.token_dim, config.bottleneck)]
+            
+            if config.nonlinearity == CPromptTuningActivation.RELU:
+                layers.append(nn.ReLU())
+            elif config.nonlinearity == CPromptTuningActivation.TANH:
+                layers.append(nn.Tanh())
+            elif config.nonlinearity == CPromptTuningActivation.SIGM:
+                layers.append(nn.Sigmoid())
+            
+            layers.append(nn.Linear(config.bottleneck, config.token_dim))
+            
+            if config.dropout > 0:
+                layers.append(nn.Dropout(p=config.dropout))
+            if config.layer_norm:
+                layers.append(nn.LayerNorm(config.token_dim))
+            
+            self.module = nn.Sequential(*layers)
     
     def forward(self, indices):
         # Just get embeddings
         prompt_embeddings = self.conv(self.embedding(indices))
         prompt_embeddings = self.module(prompt_embeddings) + prompt_embeddings
         return prompt_embeddings
+
+    def create_reduced_embedding(self):
+        self.reduced_embedding = torch.nn.Embedding(self.config.output_embeddings, self.config.token_dim)

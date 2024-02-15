@@ -240,7 +240,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
                         self.prompt_encoder[adapter_name].kept_prune, 
                         prompt_kept
                     )
-
+            
             if is_main_process and safe_serialization:
                 # Section copied from: https://github.com/huggingface/transformers/blob/main/src/transformers/modeling_utils.py#L2111-L2134
                 # Safetensors does not allow tensor aliasing.
@@ -468,15 +468,9 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
         if self.peft_config[adapter_name].peft_type == PeftType.PREFIX_TUNING:
             prompt_tokens = prompt_tokens[:, : self.peft_config[adapter_name].num_virtual_tokens]
-
-        if self.peft_config[adapter_name].peft_type in [
-            PeftType.RPROMPT_TUNING,
-            PeftType.CPROMPT_TUNING,
-        ]:
-            prompt_embeddings = prompt_encoder.embedding(prompt_tokens)
-        else:
-            prompt_embeddings = prompt_encoder(prompt_tokens)
-
+        
+        prompt_embeddings = prompt_encoder(prompt_tokens)
+        
         if self.peft_config[adapter_name].peft_type == PeftType.RESIDUAL_PROMPT_TUNING:
             prompt_embeddings = prompt_embeddings.unsqueeze(0).expand(1, -1, -1)
 
@@ -534,7 +528,13 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
     
         else:
             if peft_config.inference_mode:
-                prompts = prompt_encoder.embedding.weight.repeat(batch_size, 1, 1)
+                if peft_config.peft_type == PeftType.RPROMPT_TUNING:
+                    prompts = prompt_encoder.reduced_embedding.weight * prompt_encoder.piece_mask.to(prompt_encoder.embedding.weight.device)
+                    prompts = prompts.repeat(batch_size, 1, 1)
+                elif peft_config.peft_type == PeftType.CPROMPT_TUNING:
+                    prompts = prompt_encoder.reduced_embedding.weight.repeat(batch_size, 1, 1)
+                else:
+                    prompts = prompt_encoder.embedding.weight.repeat(batch_size, 1, 1)
             else:
                 if peft_config.peft_type == PeftType.RESIDUAL_PROMPT_TUNING:
                     prompts = prompt_encoder(prompt_tokens)
@@ -743,10 +743,11 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
                 peft_config.inference_mode = not is_trainable
             self.add_adapter(adapter_name, peft_config)
         
-        adapters_weights = load_peft_weights(model_id, device=torch_device, **hf_hub_download_kwargs)
-
-        # load the weights into the model
-        load_result = set_peft_model_state_dict(self, adapters_weights, adapter_name=adapter_name)
+        if self.peft_config[adapter_name].peft_type in [
+            PeftType.RPROMPT_TUNING,
+            PeftType.CPROMPT_TUNING,
+        ] and not hasattr(self.prompt_encoder[adapter_name], "reduced_embedding"):
+            self.prompt_encoder[adapter_name].create_reduced_embedding()
         
         if self.peft_config[adapter_name].peft_type in [
             PeftType.XPROMPT_TUNING,
@@ -756,6 +757,11 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
                 self.prompt_encoder[adapter_name].to_prune = json.load(prompt_pruned)
             with open(os.path.join(model_id, PROMPT_KEPT), 'r') as prompt_kept:
                 self.prompt_encoder[adapter_name].kept_prune = json.load(prompt_kept)
+        
+        adapters_weights = load_peft_weights(model_id, device=torch_device, **hf_hub_download_kwargs)
+
+        # load the weights into the model
+        load_result = set_peft_model_state_dict(self, adapters_weights, adapter_name=adapter_name)
         
         if (
             (getattr(self, "hf_device_map", None) is not None)

@@ -109,6 +109,11 @@ def get_peft_model_state_dict(
         ]:
             to_return["token_mask"] = model.prompt_encoder[adapter_name].token_mask
             to_return["piece_mask"] = model.prompt_encoder[adapter_name].piece_mask
+        
+        if config.peft_type in [
+            PeftType.CPROMPT_TUNING,
+        ]:
+            to_return["token_mask"] = model.prompt_encoder[adapter_name].token_mask
     else:
         raise NotImplementedError
     
@@ -197,9 +202,14 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
     load_result = model.load_state_dict(peft_model_state_dict, strict=False)
     
     if config.is_prompt_learning:
-        model.prompt_encoder[adapter_name].embedding.load_state_dict(
-            {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
-        )
+        if hasattr(model.prompt_encoder[adapter_name], "reduced_embedding"):
+            model.prompt_encoder[adapter_name].reduced_embedding.load_state_dict(
+                {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
+            )
+        else:
+            model.prompt_encoder[adapter_name].embedding.load_state_dict(
+                {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
+            )
         
         if config.peft_type in [
             PeftType.XPROMPT_TUNING,
@@ -207,6 +217,11 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
         ]:
             model.prompt_encoder[adapter_name].token_mask = peft_model_state_dict["token_mask"]
             model.prompt_encoder[adapter_name].piece_mask = peft_model_state_dict["piece_mask"]
+        
+        if config.peft_type in [
+            PeftType.CPROMPT_TUNING,
+        ]:
+            model.prompt_encoder[adapter_name].token_mask = peft_model_state_dict["token_mask"]
     
     return load_result
 

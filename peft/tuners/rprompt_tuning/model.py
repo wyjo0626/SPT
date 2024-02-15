@@ -69,7 +69,12 @@ class RPromptEmbedding(torch.nn.Module):
         super().__init__()
         
         total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
-        self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
+        
+        if config.inference_mode:
+            self.reduced_embedding = torch.nn.Embedding(int(self.total_virtual_tokens * round(1 - self.config.token_ratio, 5)), config.token_dim)
+        else:
+            self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
+        
         self.token_mask = torch.ones(total_virtual_tokens)
         self.piece_mask = torch.ones(total_virtual_tokens, config.token_dim)
         if config.token_dim % config.token_pieces > 0:
@@ -84,7 +89,7 @@ class RPromptEmbedding(torch.nn.Module):
             self.piece_prefix: {}
         }
         
-        if config.rprompt_tuning_init == RPromptTuningInit.TEXT:
+        if config.rprompt_tuning_init == RPromptTuningInit.TEXT and not config.inference_mode:
             from transformers import AutoTokenizer
 
             tokenizer_kwargs = config.tokenizer_kwargs or {}
@@ -104,6 +109,7 @@ class RPromptEmbedding(torch.nn.Module):
             word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
             word_embedding_weights = word_embedding_weights.to(torch.float32)
             self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
+        
         
         self.config = config
         self.total_virtual_tokens = total_virtual_tokens
@@ -312,3 +318,6 @@ class RPromptEmbedding(torch.nn.Module):
             profile[k] = sorted(profile[k].items(), key=lambda x: x[1])[:target_piece_length]
         
         return profile
+
+    def create_reduced_embedding(self):
+        self.reduced_embedding = torch.nn.Embedding(int(self.total_virtual_tokens * round(1 - self.config.token_ratio, 5)), self.config.token_dim)

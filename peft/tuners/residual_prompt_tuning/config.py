@@ -86,7 +86,7 @@ class ResidualPromptTuningConfig(PromptLearningConfig):
         metadata={"help": "Set this the False if you don't use layer normalization"}
     )
     encoder_separate: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Use separate MLP for each prompt tokens"}
     )
     residual: bool = field(
