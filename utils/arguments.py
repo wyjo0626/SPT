@@ -307,7 +307,7 @@ class DynamicPeftArguments:
     encoder_num_layers: int = field(default=1, metadata={"help": "The number of layers of the mlp."})
     encoder_dropout: int = field(default=0.0, metadata={"help": "The dropout of the mlp."})
     encoder_layer_norm: bool = field(default=True, metadata={"help": "Set this the False if you don't use layer normalization"})
-    encoder_separate: bool = field(default=True, metadata={"help": "Use separate MLP for each prompt tokens"})
+    encoder_separate: bool = field(default=False, metadata={"help": "Use separate MLP for each prompt tokens"})
     residual: bool = field(default=True, metadata={"help": "Set this the False if you don't use residual connection."})
     
     # BitFitConfig
