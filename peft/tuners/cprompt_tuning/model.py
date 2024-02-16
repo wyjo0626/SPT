@@ -61,14 +61,16 @@ class CPromptEmbedding(nn.Module):
         super().__init__()
         
         total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
+        out_virtual_tokens = config.output_embeddings * config.num_transformer_submodules
         
         if config.inference_mode:
-            self.reduced_embedding = torch.nn.Embedding(config.output_embeddings, config.token_dim)
+            self.reduced_embedding = torch.nn.Embedding(out_virtual_tokens, config.token_dim)
         else:
             self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
         
-        self.token_mask = torch.ones(config.output_embeddings)
+        self.token_mask = torch.ones(out_virtual_tokens)
         self.total_virtual_tokens = total_virtual_tokens
+        self.out_virtual_tokens = out_virtual_tokens
         self.config = config
         
         if config.prompt_tuning_init == CPromptTuningInit.TEXT and not config.inference_mode:
@@ -131,7 +133,7 @@ class CPromptEmbedding(nn.Module):
             
             self.conv = nn.Conv1d(
                 in_channels=in_channels, 
-                out_channels=config.output_embeddings,
+                out_channels=out_virtual_tokens,
                 kernel_size=1,
                 stride=1,
                 bias=config.conv_bias,
@@ -169,4 +171,4 @@ class CPromptEmbedding(nn.Module):
             return self.module(prompt_embeddings)
 
     def create_reduced_embedding(self):
-        self.reduced_embedding = torch.nn.Embedding(self.config.output_embeddings, self.config.token_dim)
+        self.reduced_embedding = torch.nn.Embedding(self.out_virtual_tokens, self.config.token_dim)
