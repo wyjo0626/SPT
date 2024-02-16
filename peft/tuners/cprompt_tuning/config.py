@@ -14,7 +14,7 @@
 # limitations under the License.
 import enum
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from peft.config import PromptLearningConfig
 from peft.utils import PeftType
@@ -79,33 +79,73 @@ class CPromptTuningConfig(PromptLearningConfig):
             "help": "The output channel arguments to use for nn.Conv1d initialization."
         }
     )
-    nonlinearity: Union[CPromptTuningActivation, str] = field(
+    conv_out_channels: Optional[Union[List[int]]] = field(
+        default=None,
+        metadata={
+            "help": "List of convolution layer out_channels to create convolution."
+            "For example, [50, 40, 20]"
+            "If you don't add convolution layer, then only add 1x1 convolution."
+        }
+    )
+    conv_kernel_sizes: Optional[Union[List[int]]] = field(
+        default=None,
+        metadata={
+            "help": "List of convolution layer kernel to create convolution."
+            "For example, [3, 5, 7]"
+            "If you don't add convolution layer, then only add 1x1 convolution."
+        }
+    )
+    conv_bias: bool = field(
+        default=True,
+        metadata={
+            "help": "Set this the False if you don't add bias to conv layers."
+        }
+    )
+    conv_pool: bool = field(
+        default=True,
+        metadata={
+            "help": "Set this the False if you don't add max pooling to conv layers."
+        }
+    )
+    encoder_nonlinearity: Union[CPromptTuningActivation, str] = field(
         default=CPromptTuningActivation.RELU,
         metadata={
             "help": "The type of activation function."
         }
     )
-    layer_norm: bool = field(
+    encoder_layer_norm: bool = field(
         default=True,
         metadata={
-            "help": "Set this the False if you don't use layer normalization"
+            "help": "Set this the False if you don't use layer normalization."
         }
     )
-    dropout: float = field(
-        default=0.1,
+    encoder_dropout: float = field(
+        default=0.0,
         metadata={
-            "help": "Set this 0.0 if you don't use dropout"
+            "help": "Set this 0.0 if you don't use dropout."
         }
     )
-    bottleneck: int = field(
-        default=384,
+    encoder_bottleneck: int = field(
+        default=800,
         metadata={
             "help": "The type of bottleneck size."
+        }
+    )
+    encoder_residual: int = field(
+        default=True,
+        metadata={
+            "help": "Set this the False, if you don't add residual connection."
         }
     )
 
     def __post_init__(self):
         self.peft_type = PeftType.CPROMPT_TUNING
+
+        if isinstance(self.conv_out_channels, list):
+            if not isinstance(self.conv_kernel_sizes, list):
+                raise ValueError(f"convolution layers list is not matched with kernel size list")
+            if len(self.conv_out_channels) != len(self.conv_kernel_sizes):
+                raise ValueError(f"convolution layer list is not matched with {self.conv_out_channels}-{self.conv_kernel_sizes}")
 
         if self.tokenizer_kwargs and (self.prompt_tuning_init != CPromptTuningInit.TEXT):
             raise ValueError(

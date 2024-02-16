@@ -93,37 +93,80 @@ class CPromptEmbedding(nn.Module):
             self.embedding.weight = nn.Parameter(word_embedding_weights)
         
         if not config.inference_mode:
+            
+            in_channels = total_virtual_tokens
+            
+            if config.conv_out_channels is not None:
+                conv_layers = []
+                
+                for n in range(len(config.conv_out_channels)):
+                    kernel_size = config.conv_kernel_sizes[n]
+                    out_channel = config.conv_out_channels[n]
+                    
+                    if kernel_size % 2 == 0:
+                        raise ValueError("kernel size must be odd to keep the embedding token dimension.")
+
+                    conv_layers.append(
+                        nn.Conv1d(
+                            in_channels=in_channels,
+                            out_channels=out_channel,
+                            kernel_size=kernel_size,
+                            stride=1,
+                            padding=kernel_size // 2
+                        )
+                    )
+                    
+                    in_channels = out_channel
+                    
+                    if config.conv_pool:
+                        conv_layers.append(
+                            nn.MaxPool1d(
+                                kernel_size=kernel_size,
+                                stride=1,
+                                padding=kernel_size // 2
+                            )
+                        )
+                
+                self.conv_layers = nn.Sequential(*conv_layers)
+            
             self.conv = nn.Conv1d(
-                in_channels=total_virtual_tokens, 
+                in_channels=in_channels, 
                 out_channels=config.output_embeddings,
                 kernel_size=1,
                 stride=1,
-                bias=True,
+                bias=config.conv_bias,
             )
             
-            layers = [nn.Linear(config.token_dim, config.bottleneck)]
+            module = [nn.Linear(config.token_dim, config.encoder_bottleneck)]
             
-            if config.nonlinearity == CPromptTuningActivation.RELU:
-                layers.append(nn.ReLU())
-            elif config.nonlinearity == CPromptTuningActivation.TANH:
-                layers.append(nn.Tanh())
-            elif config.nonlinearity == CPromptTuningActivation.SIGM:
-                layers.append(nn.Sigmoid())
+            if config.encoder_nonlinearity == CPromptTuningActivation.RELU:
+                module.append(nn.ReLU())
+            elif config.encoder_nonlinearity == CPromptTuningActivation.TANH:
+                module.append(nn.Tanh())
+            elif config.encoder_nonlinearity == CPromptTuningActivation.SIGM:
+                module.append(nn.Sigmoid())
             
-            layers.append(nn.Linear(config.bottleneck, config.token_dim))
+            module.append(nn.Linear(config.encoder_bottleneck, config.token_dim))
             
-            if config.dropout > 0:
-                layers.append(nn.Dropout(p=config.dropout))
-            if config.layer_norm:
-                layers.append(nn.LayerNorm(config.token_dim))
+            if config.encoder_dropout > 0:
+                module.append(nn.Dropout(p=config.dropout))
+            if config.encoder_layer_norm:
+                module.append(nn.LayerNorm(config.token_dim))
             
-            self.module = nn.Sequential(*layers)
+            self.module = nn.Sequential(*module)
     
     def forward(self, indices):
         # Just get embeddings
-        prompt_embeddings = self.conv(self.embedding(indices))
-        prompt_embeddings = self.module(prompt_embeddings) + prompt_embeddings
-        return prompt_embeddings
+        prompt_embeddings = self.embedding(indices)
+        if hasattr(self, "conv_layers"):
+            prompt_embeddings = self.conv_layers(prompt_embeddings)
+        prompt_embeddings = self.conv(prompt_embeddings)
+        prompt_embeddings = self.module(prompt_embeddings)
+        
+        if self.config.encoder_residual:
+            return self.module(prompt_embeddings) + prompt_embeddings
+        else:
+            return self.module(prompt_embeddings)
 
     def create_reduced_embedding(self):
         self.reduced_embedding = torch.nn.Embedding(self.config.output_embeddings, self.config.token_dim)
