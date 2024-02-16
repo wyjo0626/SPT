@@ -1,4 +1,4 @@
-export MODELS_NAME="bert-base-uncased bert-large-uncased gpt2-medium gpt2-large t5-base t5-large"
+export MODELS_NAME="t5-base"
 export TASK_NAME=glue
 export CUDA_VISIBLE_DEVICES=0
 
@@ -8,8 +8,8 @@ max_steps=30000
 weight_decay=1e-5
 
 for MODEL_NAME in $MODELS_NAME; do
-  for DATASET_NAME in cola mrpc rte stsb wnli mnli qnli qqp sst2; do
-    for lr in 1e-5 1e-4 1e-3; do
+  for DATASET_NAME in stsb ; do
+    for lr in 1e-5; do
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr \
@@ -28,7 +28,7 @@ for MODEL_NAME in $MODELS_NAME; do
         --save_strategy steps \
         --evaluation_strategy steps \
         --max_steps $max_steps \
-        --eval_steps 1000 \
+        --eval_steps 1 \
         --save_steps 1000 \
         --warmup_steps 500 \
         --weight_decay $weight_decay \
