@@ -14,7 +14,7 @@ virtual_tokens_list="10 100"
 for MODEL_NAME in $MODELS_NAME; do
   for DATASET_NAME in boolq cb rte wic wsc copa; do
     for var in $virtual_tokens_list; do
-      if ["$DATASET_NAME" = "boolq"] || ["$DATASET_NAME" = "rte"] || ["$DATASET_NAME" = "wic"]; then
+      if [ "$DATASET_NAME" = "boolq" ] || [ "$DATASET_NAME" = "rte" ] || [ "$DATASET_NAME" = "wic" ]; then
         epochs=20
       else
         epochs=40
