@@ -61,7 +61,6 @@ for MODEL_NAME in $MODELS_NAME; do
       fi
       conv_out_channels="100 75 50 25"
       conv_kernel_sizes="5 5 5 5"
-      if test "$MODELS_NAME" = "t5-base"; then conv_out_channels="200 150 100 50"; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name EXP1-$TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$PEFT_TYPE-$var-token-$seed-conv-100-75-50-25 \
@@ -106,7 +105,6 @@ for MODEL_NAME in $MODELS_NAME; do
       fi
       conv_out_channels="75 50 25"
       conv_kernel_sizes="5 5 5"
-      if test "$MODELS_NAME" = "t5-base"; then conv_out_channels="150 100 50"; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name EXP1-$TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$PEFT_TYPE-$var-token-$seed-conv-75-50-25 \
@@ -151,7 +149,6 @@ for MODEL_NAME in $MODELS_NAME; do
       fi
       conv_out_channels="50 25"
       conv_kernel_sizes="5 5"
-      if test "$MODELS_NAME" = "t5-base"; then conv_out_channels="100 50"; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name EXP1-$TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$PEFT_TYPE-$var-token-$seed-conv-50-25 \
@@ -196,7 +193,6 @@ for MODEL_NAME in $MODELS_NAME; do
       fi
       conv_out_channels="25"
       conv_kernel_sizes="5"
-      if test "$MODELS_NAME" = "t5-base"; then conv_out_channels="50"; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name EXP1-$TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$PEFT_TYPE-$var-token-$seed-conv-25 \

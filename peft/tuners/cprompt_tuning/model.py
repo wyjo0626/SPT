@@ -103,7 +103,7 @@ class CPromptEmbedding(nn.Module):
                 
                 for n in range(len(config.conv_out_channels)):
                     kernel_size = config.conv_kernel_sizes[n]
-                    out_channel = config.conv_out_channels[n]
+                    out_channel = config.conv_out_channels[n] * config.num_transformer_submodules
                     
                     if kernel_size % 2 == 0:
                         raise ValueError("kernel size must be odd to keep the embedding token dimension.")
