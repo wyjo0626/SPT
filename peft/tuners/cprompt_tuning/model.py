@@ -97,9 +97,9 @@ class CPromptEmbedding(nn.Module):
         if not config.inference_mode:
             
             in_channels = total_virtual_tokens
+            conv_layers = []
             
             if config.conv_out_channels is not None:
-                conv_layers = []
                 
                 for n in range(len(config.conv_out_channels)):
                     kernel_size = config.conv_kernel_sizes[n]
@@ -114,7 +114,8 @@ class CPromptEmbedding(nn.Module):
                             out_channels=out_channel,
                             kernel_size=kernel_size,
                             stride=1,
-                            padding=kernel_size // 2
+                            padding=kernel_size // 2,
+                            bias=config.conv_bias,
                         )
                     )
                     
@@ -128,15 +129,15 @@ class CPromptEmbedding(nn.Module):
                                 padding=kernel_size // 2
                             )
                         )
-                
-                self.conv_layers = nn.Sequential(*conv_layers)
             
-            self.conv = nn.Conv1d(
-                in_channels=in_channels, 
-                out_channels=out_virtual_tokens,
-                kernel_size=1,
-                stride=1,
-                bias=config.conv_bias,
+            conv_layers.append(
+                nn.Conv1d(
+                    in_channels=in_channels, 
+                    out_channels=out_virtual_tokens,
+                    kernel_size=1,
+                    stride=1,
+                    bias=config.conv_bias,
+                )
             )
             
             module = [nn.Linear(config.token_dim, config.encoder_bottleneck)]
@@ -156,15 +157,12 @@ class CPromptEmbedding(nn.Module):
                 module.append(nn.LayerNorm(config.token_dim))
             
             self.module = nn.Sequential(*module)
+            self.conv_layers = nn.Sequential(*conv_layers)
     
     def forward(self, indices):
         # Just get embeddings
         prompt_embeddings = self.embedding(indices)
-        if hasattr(self, "conv_layers"):
-            prompt_embeddings = self.conv_layers(prompt_embeddings)
-        prompt_embeddings = self.conv(prompt_embeddings)
-        prompt_embeddings = self.module(prompt_embeddings)
-        
+        prompt_embeddings = self.conv_layers(prompt_embeddings)
         if self.config.encoder_residual:
             return self.module(prompt_embeddings) + prompt_embeddings
         else:
