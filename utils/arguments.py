@@ -198,6 +198,11 @@ class DynamicTrainingArguments(Seq2SeqTrainingArguments):
             "than this will be truncated, sequences shorter will be padded."
         },
     )
+    generation_num_beams: Optional[int] = field(
+        default=1, 
+        metadata={"help": "Number of beams to use for evaluation."}
+    )
+
 
 @dataclass
 class DynamicPeftArguments:
