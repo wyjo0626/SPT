@@ -231,7 +231,10 @@ class AbstractDataset(ABC):
                                       padding=self.padding,
                                       truncation=True)
         # Setup the tokenizer for targets
-        labels = torch.tensor([int(i) for i in examples['target']])
+        if self.is_regression:
+            labels = torch.tensor([self.round_stsb_target(float(i)) for i in examples["target"]])
+        else:
+            labels = torch.tensor([int(i) for i in examples['target']])
         model_inputs['labels'] = labels
         return model_inputs
     
