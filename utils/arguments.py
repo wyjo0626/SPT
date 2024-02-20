@@ -462,6 +462,10 @@ class DynamicPeftArguments:
             "help": "The type of bottleneck size."
         }
     )
+    encoder_num_modules: int = field(
+        default=1,
+        metadata={"help": "The number of modules of the mlp."}
+    )
     encoder_residual: int = field(
         default=True,
         metadata={

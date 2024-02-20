@@ -17,7 +17,7 @@ import math
 import torch
 import torch.nn as nn
 
-from .config import CPromptTuningInit, CPromptTuningActivation
+from .config import CPromptTuningInit, CPromptTuningActivation, CPromptTuningConfig
 
 
 class CPromptEmbedding(nn.Module):
@@ -156,6 +156,18 @@ class CPromptEmbedding(nn.Module):
             if config.encoder_layer_norm:
                 module.append(nn.LayerNorm(config.token_dim))
             
+            num_modules = config.encoder_num_modules
+            if num_modules > 2:
+                encoder_num_modules_default = CPromptTuningConfig.encoder_num_modules
+                warnings.warn(
+                    f"Since only MLP 1 and 2 layers were used in Residual Prompt Tuning (Zhengxiang et al.),"
+                    f"for MLP, the argument `encoder_num_layers` is ignored."
+                    f"Exactly {encoder_num_modules_default} MLP layers are used"
+                )
+                num_modules = encoder_num_modules_default
+            if num_modules == 2:
+                module = module + module
+            print(module)
             self.module = nn.Sequential(*module)
             self.conv_layers = nn.Sequential(*conv_layers)
     
