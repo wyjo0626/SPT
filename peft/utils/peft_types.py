@@ -45,3 +45,12 @@ class TaskType(str, enum.Enum):
     TOKEN_CLS = "TOKEN_CLS"
     QUESTION_ANS = "QUESTION_ANS"
     FEATURE_EXTRACTION = "FEATURE_EXTRACTION"
+
+
+class InitType(str, enum.Enum):
+    """Enum class for the initialization types of prompts in PromptLearning"""
+
+    DEFAULT = "DEFAULT"
+    RANDOM_UNIFORM = "RANDOM_UNIFORM"
+    SAMPLED_RANDOM = "SAMPLED_RANDOM"
+    TEXT = "TEXT"
