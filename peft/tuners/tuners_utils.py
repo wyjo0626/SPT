@@ -14,6 +14,8 @@
 # limitations under the License.
 import logging
 import re
+import numpy as np
+import math
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -28,7 +30,7 @@ from transformers.pytorch_utils import Conv1D
 
 from peft.utils import INCLUDE_LINEAR_LAYERS_SHORTHAND
 
-from ..config import PeftConfig
+from ..config import PeftConfig, InitType
 from ..utils import ModulesToSaveWrapper, _get_submodules
 
 
@@ -476,6 +478,57 @@ class BaseTunerLayer(ABC):
                         f"{new_active_adapter}."
                     )
                     self.set_adapter(remaining_adapters[0])
+
+
+class BaseEmbedding(nn.Module, ABC):
+    def __init__(self, config, word_embeddings) -> None:
+        super().__init__()
+        
+        total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
+        token_dim = config.token_dim
+        
+        self.embedding = nn.Embedding(total_virtual_tokens, token_dim)
+        # init from random uniform
+        # following prompt-tuning (Lester et al), then use random uniform with range [-0.5, 0.5]
+        if not config.inference_mode:
+            if config.init_type == InitType.RANDOM_UNIFORM:
+                r1, r2 = -1 * config.init_range, config.init_range
+                x  = (r1 - r2) * torch.rand(total_virtual_tokens, token_dim) + r2
+                self.embedding.weight = torch.nn.Parameter(x)
+            elif config.init_type == InitType.SAMPLED_RANDOM:
+                token = np.random.randint(word_embeddings.weight.shape[0], size=total_virtual_tokens)
+                word_embedding_weights = word_embeddings.weight[token].detach().clone()
+                word_embedding_weights = word_embedding_weights.to(torch.float32)
+                self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
+            elif config.init_type == InitType.TEXT:
+                from transformers import AutoTokenizer
+                
+                tokenizer_kwargs = config.tokenizer_kwargs or {}
+                tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name_or_path, **tokenizer_kwargs)
+                
+                init_text = config.init_text
+                init_token_ids = tokenizer(init_text)["input_ids"]
+                # Trim or iterate until num_text_tokens matches total_virtual_tokens
+                num_text_tokens = len(init_token_ids)
+                if num_text_tokens > total_virtual_tokens:
+                    init_token_ids = init_token_ids[:total_virtual_tokens]
+                elif num_text_tokens < total_virtual_tokens:
+                    num_reps = math.ceil(total_virtual_tokens / num_text_tokens)
+                    init_token_ids = init_token_ids * num_reps
+                init_token_ids = init_token_ids[:total_virtual_tokens]
+                init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
+                
+                word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
+                word_embedding_weights = word_embedding_weights.to(torch.float32)
+                self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
+                
+        self.total_virtual_tokens = total_virtual_tokens
+        self.token_dim = token_dim
+    
+    def forward(self, indices):
+        # Just get embeddings
+        ...
+
 
 @contextmanager
 def onload_layer(layer):

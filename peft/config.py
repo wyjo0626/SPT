@@ -21,7 +21,7 @@ from typing import Dict, Optional, Union
 from huggingface_hub import hf_hub_download
 from transformers.utils import PushToHubMixin
 
-from .utils import CONFIG_NAME, PeftType, TaskType
+from .utils import CONFIG_NAME, PeftType, TaskType, InitType
 
 
 @dataclass
@@ -234,6 +234,41 @@ class PromptLearningConfig(PeftConfig):
     )
     num_attention_heads: Optional[int] = field(default=None, metadata={"help": "Number of attention heads"})
     num_layers: Optional[int] = field(default=None, metadata={"help": "Number of transformer layers"})
+    init_type: Optional[Union[str, InitType]] = field(
+        default=InitType.DEFAULT, 
+        metadata={"help": "Initialization type"}
+    )
+    init_range: Optional[float] = field(
+        default=0.5,
+        metadata={
+            "help": "the range of embedding for prompt initialization. Only used if init_type is `RANDOM_UNIFORM`"
+                    "if range value is 0.5, then embeddiong range is [-0.5, 0.5]"
+        }
+    )
+    init_text: Optional[str] = field(
+        default=None,
+        metadata={"help": "the text to use for prompt tuning initialization. Only used if init_type is `TEXT`"}
+    )
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
+        },
+    )
+    tokenizer_kwargs: Optional[dict] = field(
+        default=None,
+        metadata={"help": "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if init_type is not `RANDOM_UNIFORM` and `None`"}
+    )
+    
+    def __post_init__(self):
+        if (self.tokenizer_kwargs or self.tokenizer_name_or_path) and (self.init_type == InitType.RANDOM_UNIFORM or self.init_type == InitType.DEFAULT or self.init_type == InitType.SAMPLED_RANDOM):
+            raise ValueError(
+                f"tokenizer_kwargs can't not valid when using init_type!=`{self.init_type}`."
+            )
+        if self.init_type == InitType.TEXT and self.init_text is None:
+            raise ValueError(
+                f"you use initialization type is `{self.init_type}` but you don't set init_text"
+            )
     
     @property
     def is_prompt_learning(self) -> bool:
