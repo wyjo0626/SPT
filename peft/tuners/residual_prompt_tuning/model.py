@@ -17,10 +17,10 @@ import warnings
 import torch
 
 from .config import (
-    ResidualPromptTuningConfig, 
-    ResidualPromptTuningInit, 
+    ResidualPromptTuningConfig,
     ResidualPromptTuningReparameterizationType
 )
+from peft.tuners.tuners_utils import BaseEmbedding
 
 
 class ResidualMLP(torch.nn.Module):
@@ -96,9 +96,10 @@ class ResidualMLP(torch.nn.Module):
             return output_embeds
 
 
-class ResidualPromptEmbedding(torch.nn.Module):
+class ResidualPromptEmbedding(BaseEmbedding):
     """
     The model to encode virtual tokens into prompt embeddings with residual connections.
+    Implements residual prompt-tuning as described in https://arxiv.org/pdf/2305.03937v1.pdf
     
     Args:
         config ([`ResidualPromptTuningConfig`]): The configuration of the residual prompt embedding.
@@ -120,8 +121,8 @@ class ResidualPromptEmbedding(torch.nn.Module):
     ...     num_transformer_submodules=1,
     ...     num_attention_heads=12,
     ...     num_layers=12,
-    ...     residual_prompt_tuning_init="TEXT",
-    ...     residual_prompt_tuning_init_text="Predict if sentiment of this review is positive, negative or neutral",
+    ...     init_type="TEXT",
+    ...     init_text="Predict if sentiment of this review is positive, negative or neutral",
     ...     tokenizer_name_or_path="t5-base",
     ...     encoder_reparameterization_type="MLP",
     ...     encoder_bottleneck_size=800,
@@ -141,32 +142,9 @@ class ResidualPromptEmbedding(torch.nn.Module):
     Output Shape: (`batch_size`, `total_virtual_tokens`, `token_dim`)
     """
     def __init__(self, config, word_embeddings):
-        super().__init__()
+        super().__init__(config, word_embeddings)
         
         self.separate = config.encoder_separate
-        self.total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
-        self.embedding = torch.nn.Embedding(self.total_virtual_tokens, config.token_dim)
-        
-        if config.residual_prompt_tuning_init == ResidualPromptTuningInit.TEXT and not config.inference_mode:
-            from transformers import AutoTokenizer
-            
-            tokenizer_kwargs = config.tokenizer_kwargs or {}
-            tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name_or_path, **tokenizer_kwargs)
-            init_text = config.prompt_tuning_init_text
-            init_token_ids = tokenizer(init_text)["input_ids"]
-            # Trim or iterate until num_text_tokens matches total_virtual_tokens
-            num_text_tokens = len(init_token_ids)
-            if num_text_tokens > self.total_virtual_tokens:
-                init_token_ids = init_token_ids[:self.total_virtual_tokens]
-            elif num_text_tokens < self.total_virtual_tokens:
-                num_reps = math.ceil(self.total_virtual_tokens / num_text_tokens)
-                init_token_ids = init_token_ids * num_reps
-            init_token_ids = init_token_ids[:self.total_virtual_tokens]
-            init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
-            
-            word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
-            word_embedding_weights = word_embedding_weights.to(torch.float32)
-            self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
         
         if not config.inference_mode:
             if self.separate:

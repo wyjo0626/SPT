@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .config import RPromptTuningConfig, RPromptTuningInit
+from .config import RPromptTuningConfig
 from .model import RPromptEmbedding
 
 
-__all__ = ["RPromptTuningConfig", "RPromptEmbedding", "RPromptTuningInit"]
+__all__ = ["RPromptTuningConfig", "RPromptEmbedding"]

@@ -7,13 +7,10 @@ from typing import Optional, Union, List
 from transformers import HfArgumentParser, TrainingArguments, Seq2SeqTrainingArguments
 from peft import (
     PeftType, 
-    PromptTuningInit,
-    XPromptTuningInit, 
-    CPromptTuningInit,
+    InitType,
     CPromptTuningActivation,
     LoftQConfig, 
-    PromptEncoderReparameterizationType, 
-    ResidualPromptTuningInit,
+    PromptEncoderReparameterizationType,
     ResidualPromptTuningReparameterizationType
 )
 
@@ -215,19 +212,39 @@ class DynamicPeftArguments:
     # PromptLearningConfig
     num_virtual_tokens: int = field(default=None, metadata={"help": "Number of virtual tokens"})
     
-    # PromptTuningConfig
-    prompt_tuning_init: Union[PromptTuningInit, str] = field(
-        default=PromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
+    init_type: Optional[Union[str, InitType]] = field(
+        default=InitType.DEFAULT, 
+        metadata={"help": "Initialization type"}
     )
-    prompt_tuning_init_text: Optional[str] = field(
+    init_range: Optional[float] = field(
+        default=0.5,
+        metadata={
+            "help": "the range of embedding for prompt initialization. Only used if init_type is `RANDOM_UNIFORM`"
+                    "if range value is 0.5, then embeddiong range is [-0.5, 0.5]"
+        }
+    )
+    init_text: Optional[str] = field(
+        default=None,
+        metadata={"help": "the text to use for prompt tuning initialization. Only used if init_type is `TEXT`"}
+    )
+    tokenizer_name_or_path: Optional[str] = field(
         default=None,
         metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
+            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
         },
     )
+    tokenizer_kwargs: Optional[dict] = field(
+        default=None,
+        metadata={"help": "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if init_type is not `RANDOM_UNIFORM` and `None`"}
+    )
+    
+    # PromptTuningConfig
     
     # PrefixTuningConfig
+    encoder_hidden_size: int = field(
+        default=None,
+        metadata={"help": "The hidden size of the encoder"},
+    )
     prefix_projection: bool = field(
         default=False,
         metadata={"help": "Whether to project the prefix tokens"},
@@ -292,19 +309,6 @@ class DynamicPeftArguments:
     total_step: Optional[int] = field(default=None, metadata={"help": "The total training steps."})
     
     # ResidualPromptTuningConfig
-    residual_prompt_tuning_init: Union[ResidualPromptTuningInit, str] = field(
-        default=ResidualPromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
-    )
-    residual_prompt_tuning_init_text: Optional[str] = field(default=None, metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"},
-    )
-    tokenizer_name_or_path: Optional[str] = field(default=None, metadata={
-            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"},
-    )
-    tokenizer_kwargs: Optional[dict] = field(default=None,metadata={
-            "help": ("The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is `TEXT`"),},
-    )
     encoder_reparameterization_type: Union[str, ResidualPromptTuningReparameterizationType] = field(
         default=ResidualPromptTuningReparameterizationType.MLP, metadata={"help": "How to reparameterize of the prompt."}
     )
@@ -316,48 +320,8 @@ class DynamicPeftArguments:
     residual: bool = field(default=True, metadata={"help": "Set this the False if you don't use residual connection."})
     
     # BitFitConfig
-    target_modules: Optional[Union[List[str], str]] = field(
-        default=None,
-        metadata={
-            "help": "List of module names or regex expression of the module names to replace with Lora."
-            "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
-        },
-    ),
-    modules_to_save: Optional[List[str]] = field(
-        default=None,
-        metadata={
-            "help": "List of modules apart from LoRA layers to be set as trainable and saved in the final checkpoint. "
-            "For example, in Sequence Classification or Token Classification tasks, "
-            "the final layer `classifier/score` are randomly initialized and as such need to be trainable and saved."
-        },
-    ),
     
     # [X/R]PromptTuningConfig
-    xprompt_tuning_init: Union[XPromptTuningInit, str] = field(
-        default=XPromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
-    )
-    xprompt_tuning_init_text: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_kwargs: Optional[dict] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is "
-                "`TEXT`"
-            ),
-        },
-    )
     prune_step: int = field(
         default=15000,
         metadata={
@@ -376,34 +340,8 @@ class DynamicPeftArguments:
         default=0.5,
         metadata={"help": "The ratio to prune for soft prompt piece"}
     )
+    
     # CPromptTuningConfig
-    prompt_tuning_init: Union[CPromptTuningInit, str] = field(
-        default=CPromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
-    )
-    prompt_tuning_init_text: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    
-    tokenizer_kwargs: Optional[dict] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is "
-                "`TEXT`"
-            ),
-        },
-    )
-    
     output_embeddings: Optional[int] = field(
         default=10,
         metadata={

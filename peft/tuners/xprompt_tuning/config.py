@@ -20,51 +20,17 @@ from peft.config import PromptLearningConfig
 from peft.utils import PeftType
 
 
-class XPromptTuningInit(str, enum.Enum):
-    TEXT = "TEXT"
-    RANDOM = "RANDOM"
-
-
 @dataclass
 class XPromptTuningConfig(PromptLearningConfig):
     """
-    This is the configuration class to store the configuration of a [`PromptEmbedding`].
-
+    This is the configuration class to store the configuration of a [`XPromptEmbedding`].
+    
     Args:
-        prompt_tuning_init (Union[[`XPromptTuningInit`], `str`]): The initialization of the prompt embedding.
-        prompt_tuning_init_text (`str`, *optional*):
-            The text to initialize the prompt embedding. Only used if `prompt_tuning_init` is `TEXT`.
-        tokenizer_name_or_path (`str`, *optional*):
-            The name or path of the tokenizer. Only used if `prompt_tuning_init` is `TEXT`.
-        tokenizer_kwargs (`dict`, *optional*):
-            The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if `prompt_tuning_init` is
-            `TEXT`.
+        prune_step (`int`): Pruning is performed at this step, followed by rewinding in the remaining step.
+        token_pieces (`int`): Separate the embedding vector in k pieces.
+        token_ratio (`int`): The ratio to prune for soft prompt tokens.
+        piece_ratio (`int`): The ratio to prune for soft prompt piece
     """
-    xprompt_tuning_init: Union[XPromptTuningInit, str] = field(
-        default=XPromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
-    )
-    xprompt_tuning_init_text: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_kwargs: Optional[dict] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is "
-                "`TEXT`"
-            ),
-        },
-    )
     prune_step: int = field(
         default=15000,
         metadata={
@@ -86,8 +52,3 @@ class XPromptTuningConfig(PromptLearningConfig):
 
     def __post_init__(self):
         self.peft_type = PeftType.XPROMPT_TUNING
-
-        if self.tokenizer_kwargs and (self.prompt_tuning_init != XPromptTuningInit.TEXT):
-            raise ValueError(
-                f"tokenizer_kwargs only valid when using prompt_tuning_init='{XPromptTuningInit.TEXT.value}'."
-            )

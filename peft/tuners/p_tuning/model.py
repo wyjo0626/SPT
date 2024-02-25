@@ -20,9 +20,10 @@ import warnings
 import torch
 
 from .config import PromptEncoderConfig, PromptEncoderReparameterizationType
+from peft.tuners.tuners_utils import BaseEmbedding
 
 
-class PromptEncoder(torch.nn.Module):
+class PromptEncoder(BaseEmbedding):
     """
     The prompt encoder network that is used to generate the virtual token embeddings for p-tuning.
 
@@ -68,17 +69,14 @@ class PromptEncoder(torch.nn.Module):
 
     Output shape: (`batch_size`, `total_virtual_tokens`, `token_dim`)
     """
-    def __init__(self, config):
-        super().__init__()
-        self.token_dim = config.token_dim
+    def __init__(self, config, word_embeddings):
+        super().__init__(config, word_embeddings)
+        
         self.input_size = self.token_dim
         self.output_size = self.token_dim
         self.hidden_size = config.encoder_hidden_size
-        self.total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
         self.encoder_type = config.encoder_reparameterization_type
         
-        # embedding
-        self.embedding = torch.nn.Embedding(self.total_virtual_tokens, self.token_dim)
         if not config.inference_mode:
             if self.encoder_type == PromptEncoderReparameterizationType.LSTM:
                 lstm_dropout = config.encoder_dropout

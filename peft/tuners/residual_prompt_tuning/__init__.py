@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .config import ResidualPromptTuningConfig, ResidualPromptTuningInit, ResidualPromptTuningReparameterizationType
+from .config import ResidualPromptTuningConfig, ResidualPromptTuningReparameterizationType
 from .model import ResidualPromptEmbedding, ResidualMLP
 
-__all__ = ["ResidualPromptTuningConfig", "ResidualPromptTuningInit", "ResidualPromptTuningReparameterizationType", "ResidualPromptEmbedding", "ResidualMLP"]
+__all__ = ["ResidualPromptTuningConfig", "ResidualPromptTuningReparameterizationType", "ResidualPromptEmbedding", "ResidualMLP"]

@@ -17,15 +17,16 @@ import math
 import torch
 import torch.nn as nn
 
-from .config import CPromptTuningInit, CPromptTuningActivation, CPromptTuningConfig
+from .config import CPromptTuningActivation, CPromptTuningConfig
+from peft.tuners.tuners_utils import BaseEmbedding
 
 
-class CPromptEmbedding(nn.Module):
+class CPromptEmbedding(BaseEmbedding):
     """
     The model to encode virtual tokens into prompt embeddings.
 
     Args:
-        config ([`PromptTuningConfig`]): The configuration of the prompt embedding.
+        config ([`CPromptTuningConfig`]): The configuration of the prompt embedding.
         word_embeddings (`nn.Module`): The word embeddings of the base transformer model.
 
     **Attributes**:
@@ -34,9 +35,9 @@ class CPromptEmbedding(nn.Module):
     Example:
 
     ```py
-    >>> from peft import PromptEmbedding, PromptTuningConfig
+    >>> from peft import CPromptEmbedding, CPromptTuningConfig
 
-    >>> config = PromptTuningConfig(
+    >>> config = CPromptTuningConfig(
     ...     peft_type="PROMPT_TUNING",
     ...     task_type="SEQ_2_SEQ_LM",
     ...     num_virtual_tokens=20,
@@ -44,59 +45,34 @@ class CPromptEmbedding(nn.Module):
     ...     num_transformer_submodules=1,
     ...     num_attention_heads=12,
     ...     num_layers=12,
-    ...     prompt_tuning_init="TEXT",
-    ...     prompt_tuning_init_text="Predict if sentiment of this review is positive, negative or neutral",
+    ...     init_type="TEXT",
+    ...     init_text="Predict if sentiment of this review is positive, negative or neutral",
     ...     tokenizer_name_or_path="t5-base",
     ... )
 
     >>> # t5_model.shared is the word embeddings of the base model
-    >>> prompt_embedding = PromptEmbedding(config, t5_model.shared)
+    >>> cprompt_embedding = CPromptEmbedding(config, t5_model.shared)
     ```
 
     Input Shape: (`batch_size`, `total_virtual_tokens`)
 
-    Output Shape: (`batch_size`, `total_virtual_tokens`, `token_dim`)
+    Output Shape: (`batch_size`, `out_embeddings`, `token_dim`)
     """
     def __init__(self, config, word_embeddings):
-        super().__init__()
+        super().__init__(config, word_embeddings)
         
-        total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
         out_virtual_tokens = config.output_embeddings * config.num_transformer_submodules
         
         if config.inference_mode:
-            self.reduced_embedding = torch.nn.Embedding(out_virtual_tokens, config.token_dim)
-        else:
-            self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
+            self.reduced_embedding = torch.nn.Embedding(out_virtual_tokens, self.token_dim)
         
         self.token_mask = torch.ones(out_virtual_tokens)
-        self.total_virtual_tokens = total_virtual_tokens
         self.out_virtual_tokens = out_virtual_tokens
         self.config = config
         
-        if config.prompt_tuning_init == CPromptTuningInit.TEXT and not config.inference_mode:
-            from transformers import AutoTokenizer
-
-            tokenizer_kwargs = config.tokenizer_kwargs or {}
-            tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name_or_path, **tokenizer_kwargs)
-            init_text = config.prompt_tuning_init_text
-            init_token_ids = tokenizer(init_text)["input_ids"]
-            # Trim or iterate until num_text_tokens matches total_virtual_tokens
-            num_text_tokens = len(init_token_ids)
-            if num_text_tokens > total_virtual_tokens:
-                init_token_ids = init_token_ids[:total_virtual_tokens]
-            elif num_text_tokens < total_virtual_tokens:
-                num_reps = math.ceil(total_virtual_tokens / num_text_tokens)
-                init_token_ids = init_token_ids * num_reps
-            init_token_ids = init_token_ids[:total_virtual_tokens]
-            init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
-
-            word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
-            word_embedding_weights = word_embedding_weights.to(torch.float32)
-            self.embedding.weight = nn.Parameter(word_embedding_weights)
-        
         if not config.inference_mode:
             
-            in_channels = total_virtual_tokens
+            in_channels = self.total_virtual_tokens
             conv_layers = []
             
             if config.conv_out_channels is not None:
@@ -140,7 +116,7 @@ class CPromptEmbedding(nn.Module):
                 )
             )
             
-            module = [nn.Linear(config.token_dim, config.encoder_bottleneck)]
+            module = [nn.Linear(self.token_dim, config.encoder_bottleneck)]
             
             if config.encoder_nonlinearity == CPromptTuningActivation.RELU:
                 module.append(nn.ReLU())
@@ -149,12 +125,12 @@ class CPromptEmbedding(nn.Module):
             elif config.encoder_nonlinearity == CPromptTuningActivation.SIGM:
                 module.append(nn.Sigmoid())
             
-            module.append(nn.Linear(config.encoder_bottleneck, config.token_dim))
+            module.append(nn.Linear(config.encoder_bottleneck, self.token_dim))
             
             if config.encoder_dropout > 0:
                 module.append(nn.Dropout(p=config.dropout))
             if config.encoder_layer_norm:
-                module.append(nn.LayerNorm(config.token_dim))
+                module.append(nn.LayerNorm(self.token_dim))
             
             num_modules = config.encoder_num_modules
             if num_modules > 2:
@@ -167,7 +143,7 @@ class CPromptEmbedding(nn.Module):
                 num_modules = encoder_num_modules_default
             if num_modules == 2:
                 module = module + module
-            print(module)
+            
             self.module = nn.Sequential(*module)
             self.conv_layers = nn.Sequential(*conv_layers)
     
@@ -181,4 +157,4 @@ class CPromptEmbedding(nn.Module):
             return self.module(prompt_embeddings)
 
     def create_reduced_embedding(self):
-        self.reduced_embedding = torch.nn.Embedding(self.out_virtual_tokens, self.config.token_dim)
+        self.reduced_embedding = torch.nn.Embedding(self.out_virtual_tokens, self.token_dim)

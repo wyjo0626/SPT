@@ -18,19 +18,19 @@ import logging
 
 from utils.general import colorstr, colorformat, emojis
 
-from .config import XPromptTuningInit
+from peft.tuners.tuners_utils import BaseEmbedding
 
 
 logger = logging.getLogger(__name__)
 
 
-class XPromptEmbedding(torch.nn.Module):
+class XPromptEmbedding(BaseEmbedding):
     """
     The model to encode virtual tokens into prompt embeddings that can prune the negative tokens
     Implements xprompts as described in https://aclanthology.org/2022.emnlp-main.758.pdf
 
     Args:
-        config ([`PromptTuningConfig`]): The configuration of the prompt embedding.
+        config ([`XPromptTuningConfig`]): The configuration of the prompt embedding.
         word_embeddings (`torch.nn.Module`): The word embeddings of the base transformer model.
 
     **Attributes**:
@@ -39,23 +39,23 @@ class XPromptEmbedding(torch.nn.Module):
     Example:
 
     ```py
-    >>> from peft import PromptEmbedding, PromptTuningConfig
+    >>> from peft import XPromptEmbedding, XPromptTuningConfig
 
     >>> config = PromptTuningConfig(
-    ...     peft_type="PROMPT_TUNING",
+    ...     peft_type="XPROMPT_TUNING",
     ...     task_type="SEQ_2_SEQ_LM",
     ...     num_virtual_tokens=20,
     ...     token_dim=768,
     ...     num_transformer_submodules=1,
     ...     num_attention_heads=12,
     ...     num_layers=12,
-    ...     prompt_tuning_init="TEXT",
-    ...     prompt_tuning_init_text="Predict if sentiment of this review is positive, negative or neutral",
+    ...     init_type="TEXT",
+    ...     init_text="Predict if sentiment of this review is positive, negative or neutral",
     ...     tokenizer_name_or_path="t5-base",
     ... )
 
     >>> # t5_model.shared is the word embeddings of the base model
-    >>> prompt_embedding = PromptEmbedding(config, t5_model.shared)
+    >>> xprompt_embedding = XPromptEmbedding(config, t5_model.shared)
     ```
 
     Input Shape: (`batch_size`, `total_virtual_tokens`)
@@ -66,12 +66,11 @@ class XPromptEmbedding(torch.nn.Module):
     piece_prefix : str = "piece-level"
     
     def __init__(self, config, word_embeddings):
-        super().__init__()
+        super().__init__(config, word_embeddings)
         
-        total_virtual_tokens = config.num_virtual_tokens * config.num_transformer_submodules
-        self.embedding = torch.nn.Embedding(total_virtual_tokens, config.token_dim)
-        self.token_mask = torch.ones(total_virtual_tokens)
-        self.piece_mask = torch.ones(total_virtual_tokens, config.token_dim)
+        self.config = config
+        self.token_mask = torch.ones(self.total_virtual_tokens)
+        self.piece_mask = torch.ones(self.total_virtual_tokens, self.token_dim)
         if config.token_dim % config.token_pieces > 0:
             raise ValueError("The number of token_pieces for the token dimension does not perfectly divide.")
         
@@ -80,37 +79,12 @@ class XPromptEmbedding(torch.nn.Module):
             self.piece_prefix: {}
         }
         self.kept_prune = {
-            self.token_prefix: set(range(total_virtual_tokens)), 
+            self.token_prefix: set(range(self.total_virtual_tokens)), 
             self.piece_prefix: {
                 f"{self.token_prefix}:{token}": set(range(config.token_pieces)) 
-                for token in range(total_virtual_tokens)
+                for token in range(self.total_virtual_tokens)
             }
         }
-        
-        
-        if config.xprompt_tuning_init == XPromptTuningInit.TEXT and not config.inference_mode:
-            from transformers import AutoTokenizer
-
-            tokenizer_kwargs = config.tokenizer_kwargs or {}
-            tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name_or_path, **tokenizer_kwargs)
-            init_text = config.xprompt_tuning_init_text
-            init_token_ids = tokenizer(init_text)["input_ids"]
-            # Trim or iterate until num_text_tokens matches total_virtual_tokens
-            num_text_tokens = len(init_token_ids)
-            if num_text_tokens > total_virtual_tokens:
-                init_token_ids = init_token_ids[:total_virtual_tokens]
-            elif num_text_tokens < total_virtual_tokens:
-                num_reps = math.ceil(total_virtual_tokens / num_text_tokens)
-                init_token_ids = init_token_ids * num_reps
-            init_token_ids = init_token_ids[:total_virtual_tokens]
-            init_token_ids = torch.LongTensor(init_token_ids).to(word_embeddings.weight.device)
-
-            word_embedding_weights = word_embeddings(init_token_ids).detach().clone()
-            word_embedding_weights = word_embedding_weights.to(torch.float32)
-            self.embedding.weight = torch.nn.Parameter(word_embedding_weights)
-        
-        self.config = config
-        self.total_virtual_tokens = total_virtual_tokens
     
     def forward(self, indices):
         # Just get embeddings

@@ -64,6 +64,10 @@ if __name__ == "__main__":
     
     model_args, data_args, training_args, peft_args = args
     
+    if peft_args.tokenizer_name_or_path is None:
+        peft_args.tokenizer_name_or_path = (
+            model_args.tokenizer_name if model_args.tokenizer_name is not None else  model_args.model_name_or_path
+        )
     
     logging.basicConfig(
         level=logging.INFO,

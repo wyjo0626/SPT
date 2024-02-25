@@ -20,11 +20,6 @@ from peft.config import PromptLearningConfig
 from peft.utils import PeftType
 
 
-class CPromptTuningInit(str, enum.Enum):
-    TEXT = "TEXT"
-    RANDOM = "RANDOM"
-
-
 class CPromptTuningActivation(str, enum.Enum):
     RELU = "RELU"
     TANH = "TANH"
@@ -37,42 +32,22 @@ class CPromptTuningConfig(PromptLearningConfig):
     This is the configuration class to store the configuration of a [`PromptEmbedding`].
 
     Args:
-        prompt_tuning_init (Union[[`PromptTuningInit`], `str`]): The initialization of the prompt embedding.
-        prompt_tuning_init_text (`str`, *optional*):
-            The text to initialize the prompt embedding. Only used if `prompt_tuning_init` is `TEXT`.
-        tokenizer_name_or_path (`str`, *optional*):
-            The name or path of the tokenizer. Only used if `prompt_tuning_init` is `TEXT`.
-        tokenizer_kwargs (`dict`, *optional*):
-            The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if `prompt_tuning_init` is
-            `TEXT`.
+        output_embeddings (`int`): The output channel arguments to use for nn.Conv1d initialization.
+        conv_out_channels (`List[int]`): List of convolution layer out_channels to create convolution.
+                For example, [50, 40, 20]"
+                If you don't add convolution layer, then only add 1x1 convolution.
+        conv_kernel_sizes (`List[int]`): List of convolution layer kernel to create convolution.
+                For example, [3, 5, 7]
+                If you don't add convolution layer, then only add 1x1 convolution.
+        conv_bias (`bool`): Set this the False if you don't add bias to conv layers.
+        conv_pool (`bool`): Set this the False if you don't add max pooling to conv layers.
+        encoder_nonlinearity (`CPromptTuningActivation`): The type of activation function.
+        encoder_layer_norm (`bool`): Set this the False if you don't use layer normalization.
+        encoder_dropout (`float`): Set this 0.0 if you don't use dropout.
+        encoder_bottleneck (`int`): The type of bottleneck size.
+        encoder_num_modules (`int`): The number of modules of the mlp.
+        encoder_residual (`int`): Set this the False, if you don't add residual connection.
     """
-    prompt_tuning_init: Union[CPromptTuningInit, str] = field(
-        default=CPromptTuningInit.RANDOM,
-        metadata={"help": "How to initialize the prompt tuning parameters"},
-    )
-    prompt_tuning_init_text: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The text to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The tokenizer to use for prompt tuning initialization. Only used if prompt_tuning_init is `TEXT`"
-        },
-    )
-    
-    tokenizer_kwargs: Optional[dict] = field(
-        default=None,
-        metadata={
-            "help": (
-                "The keyword arguments to pass to `AutoTokenizer.from_pretrained`. Only used if prompt_tuning_init is "
-                "`TEXT`"
-            ),
-        },
-    )
-    
     output_embeddings: Optional[int] = field(
         default=10,
         metadata={
@@ -150,8 +125,3 @@ class CPromptTuningConfig(PromptLearningConfig):
                 raise ValueError(f"convolution layers list is not matched with kernel size list")
             if len(self.conv_out_channels) != len(self.conv_kernel_sizes):
                 raise ValueError(f"convolution layer list is not matched with {self.conv_out_channels}-{self.conv_kernel_sizes}")
-
-        if self.tokenizer_kwargs and (self.prompt_tuning_init != CPromptTuningInit.TEXT):
-            raise ValueError(
-                f"tokenizer_kwargs only valid when using prompt_tuning_init='{CPromptTuningInit.TEXT.value}'."
-            )
