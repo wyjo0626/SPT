@@ -13,7 +13,7 @@ task_to_keys = {
     "cb": ("premise", "hypothesis"),                #     250   no test
     "rte": ("premise", "hypothesis"),               #   2,490   no test
     "wic": ("sentence1", "sentence2"),              #   5,428   no test
-    "wsc.fixed": ("span1_text", "span2_text"),      #     554   no test
+    "wsc": ("span1_text", "span2_text"),      #     554   no test
     "copa": (None, None),                           #     400   no test
     "record": (None, None),                         # 100,730   no test
     "multirc": ("paragraph", "question_answer")     #  27,243   no test
@@ -24,14 +24,14 @@ task_to_metrics = {
     "cb": {"name": ["f1_multiclass", "accuracy"], "metrics": [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]},
     "rte": {"name": ["accuracy"], "metrics": [metrics.accuracy]},
     "wic": {"name": ["accuracy"], "metrics": [metrics.accuracy]},
-    "wsc.fixed": {"name": ["accuracy"], "metrics": [metrics.accuracy]},
+    "wsc": {"name": ["accuracy"], "metrics": [metrics.accuracy]},
     "copa": {"name": ["accuracy"], "metrics": [metrics.accuracy]},
     "record": {"name": ["f1", "em"], "metrics": [metrics.f1_score_with_invalid, metrics.exact_match]},
     "multirc": {"name": ["f1", "em"], "metrics": [metrics.f1_score_with_invalid, metrics.exact_match]},
 }
 
 small_datasets_without_all_splits = [
-    "boolq", "cb", "rte", "wic", "wsc.fixed", "copa"
+    "boolq", "cb", "rte", "wic", "wsc", "copa"
 ]
 
 large_datasets_without_all_splits = [
@@ -71,7 +71,7 @@ class SuperGlueDataset(AbstractDataset):
                   f"{colorstr('bright_magenta', 'bold', 'label')} : "
                   f"{self.id2label[self.raw_datasets['train'][0]['label']]}"
                   )
-        elif self.name == "wsc.fixed":
+        elif self.name == "wsc":
             print(f"{colorstr('bright_magenta', 'bold', 'text')} : {self.raw_datasets['train'][0]['text']}\n"
                   f"{colorstr('bright_magenta', 'bold', 'span')} : {self.raw_datasets['train'][0][self.sentence2_key]}, {self.raw_datasets['train'][0][self.sentence1_key]}\n"
                   f"{colorstr('bright_magenta', 'bold', 'label')} : "
@@ -147,7 +147,7 @@ class SuperGlueDataset(AbstractDataset):
                 src_texts = [example['word'] + ":", example[self.sentence1_key],
                              example['word'] + ":", example[self.sentence2_key]]
         
-        elif self.name == "wsc.fixed":
+        elif self.name == "wsc":
             if self.data_args.template_id == 0:
                 
                 def _mark_span(text, span_str, span_idx, mark):
