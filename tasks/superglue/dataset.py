@@ -215,7 +215,12 @@ class SuperGlueDataset(AbstractDataset):
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix, extra_fields)
 
     def preprocessor_record_function(self, batch, add_prefix=True):
-        new_batch = collections.defaultdict(list)
+        results = {
+            "source": list(),
+            "target": list(),
+            "task": list(),
+            "extra_fields": list()
+        }
         keys = batch.keys()
         
         for values in zip(*batch.values()):
@@ -224,20 +229,23 @@ class SuperGlueDataset(AbstractDataset):
             passage = ex["passage"]
             passage = re.sub(r'(\.|\?|\!|\"|\')\n@highlight\n', r'\1 ', passage)
             passage = re.sub(r'\n@highlight\n', '. ', passage)
-            inputs = f"record query: {ex['query']} entities: {', '.join(ex['entities'])} passage: {passage}"
+            query = ex["query"]
+            answers = ex["answers"]
+            inputs = f"passage: {passage} query: {query}" 
             
             if add_prefix:
                 inputs = self.name + " " + inputs
             
-            # duplicates the samples based on number of answers.
-            num_answers = len(ex["answer"])
-            num_duplicates = np.maximum(1, num_answers)
-            new_batch["source"].extend([inputs] * num_duplicates)
-            new_batch["target"].extend(ex["answers"] if num_answers > 0 else self.tokenizer.unk_token)
-            new_batch["task"].extend([self.name] * num_duplicates)
-            new_batch["extra_fields"].extend([{"answers": ex["answers"]}] * num_duplicates)
+            for ent_idx, ent in enumerate(ex["entities"]):
+                source = inputs.replace("@placeholder", ent)
+                label = 1 if ent in answers else 0
+                
+                results["source"].append(source)
+                results["target"].append(str(label))
+                results["task"].append(self.name)
+                results["extra_fields"].append({"answers": answers})
         
-        return new_batch
+        return results
 
     def preprocess_k_shot_dataset(self):
         None
