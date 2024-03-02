@@ -1,19 +1,24 @@
-export MODELS_NAME="bert-base-uncased bert-large-uncased gpt2-medium gpt2-large t5-base t5-large"
+export MODELS_NAME="t5-base t5-large"
 export TASK_NAME=glue
 export CUDA_VISIBLE_DEVICES=0
+export PEFT_TYPE=CPROMPT_TUNING
 
 max_seq_length=256
-bs=32
+bs=16
 max_steps=30000
-weight_decay=1e-5
-k_shot=10
+lrs="3e-3 1e-2 3e-2 1e-1 3e-1"
+weight_decay=0.01
+seed=42
+init_type=RANDOM_UNIFORM
+target_token=10
+source_token=100
 
 for MODEL_NAME in $MODELS_NAME; do
-  for DATASET_NAME in cola mrpc rte stsb wnli mnli qnli qqp sst2; do
-    for lr in 1e-5 1e-4 1e-3; do
+  for DATASET_NAME in cola mrpc rte stsb mnli qnli qqp sst2; do
+    for lr in $lrs; do
       python run.py \
         --model_name_or_path $MODEL_NAME \
-        --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$k_shot-shot \
+        --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$seed-$PEFT_TYPE-$virtual_token-token \
         --task_name $TASK_NAME \
         --dataset_name $DATASET_NAME \
         --do_train \
@@ -22,9 +27,9 @@ for MODEL_NAME in $MODELS_NAME; do
         --per_device_train_batch_size $bs \
         --per_device_eval_batch_size $bs \
         --max_seq_length $max_seq_length \
-        --output_dir checkpoints/FFT/$MODEL_NAME/$TASK_NAME-$DATASET_NAME-$lr-$k_shot-shot/ \
+        --output_dir checkpoints/PEFT/$PEFT_TYPE/$MODEL_NAME/$TASK_NAME-$DATASET_NAME-$lr-$seed-$virtual_token-token/ \
         --overwrite_output_dir \
-        --seed 42 \
+        --seed $seed \
         --learning_rate $lr \
         --save_strategy steps \
         --evaluation_strategy steps \
@@ -35,7 +40,14 @@ for MODEL_NAME in $MODELS_NAME; do
         --weight_decay $weight_decay \
         --load_best_model_at_end \
         --save_total_limit 1 \
-        --k_shot_example $k_shot;
+        --peft_type $PEFT_TYPE \
+        --init_type $init_type \
+        --num_virtual_tokens $source_token \
+        --out_embeddings $target_token \
+        --conv_bias False \
+        --conv_pool False \
+        --encoder_num_modules 2 \
+        --encoder_bottleneck_size 400;
     done;
   done;
 done;

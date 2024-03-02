@@ -13,7 +13,7 @@ init_type=RANDOM_UNIFORM
 virtual_token=10
 
 for MODEL_NAME in $MODELS_NAME; do
-  for DATASET_NAME in boolq cb rte wic wsc copa record multirc; do
+  for DATASET_NAME in boolq cb rte wic wsc multirc; do
     for lr in $lrs; do
       if test "$DATASET_NAME" = "multirc"; then max_seq_length=348; fi
       python run.py \

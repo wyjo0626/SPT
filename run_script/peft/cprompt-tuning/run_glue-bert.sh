@@ -1,7 +1,7 @@
 export MODELS_NAME="bert-base-uncased bert-large-uncased"
-export TASK_NAME=super_glue
+export TASK_NAME=glue
 export CUDA_VISIBLE_DEVICES=0
-export PEFT_TYPE=P_TUNING
+export PEFT_TYPE=CPROMPT_TUNING
 
 max_seq_length=256
 bs=16
@@ -10,12 +10,12 @@ lrs="1e-5 5e-5 1e-4 5e-4 1e-3"
 weight_decay=0.01
 seed=42
 init_type=RANDOM_UNIFORM
-virtual_token=10
+target_token=10
+source_token=100
 
 for MODEL_NAME in $MODELS_NAME; do
-  for DATASET_NAME in boolq cb rte wic wsc multirc; do
+  for DATASET_NAME in cola mrpc rte stsb mnli qnli qqp sst2; do
     for lr in $lrs; do
-      if test "$DATASET_NAME" = "multirc"; then max_seq_length=348; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
         --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$seed-$PEFT_TYPE-$virtual_token-token \
@@ -42,7 +42,12 @@ for MODEL_NAME in $MODELS_NAME; do
         --save_total_limit 1 \
         --peft_type $PEFT_TYPE \
         --init_type $init_type \
-        --num_virtual_tokens $virtual_token;
+        --num_virtual_tokens $source_token \
+        --out_embeddings $target_token \
+        --conv_bias False \
+        --conv_pool False \
+        --encoder_num_modules 2 \
+        --encoder_bottleneck_size 400;
     done;
   done;
 done;

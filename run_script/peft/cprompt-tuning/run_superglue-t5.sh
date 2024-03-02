@@ -1,16 +1,17 @@
-export MODELS_NAME="bert-base-uncased bert-large-uncased"
+export MODELS_NAME="t5-base t5-large"
 export TASK_NAME=super_glue
 export CUDA_VISIBLE_DEVICES=0
-export PEFT_TYPE=P_TUNING
+export PEFT_TYPE=CPROMPT_TUNING
 
 max_seq_length=256
 bs=16
 max_steps=30000
-lrs="1e-5 5e-5 1e-4 5e-4 1e-3"
+lrs="3e-3 1e-2 3e-2 1e-1 3e-1"
 weight_decay=0.01
 seed=42
 init_type=RANDOM_UNIFORM
-virtual_token=10
+target_token=10
+source_token=100
 
 for MODEL_NAME in $MODELS_NAME; do
   for DATASET_NAME in boolq cb rte wic wsc multirc; do
@@ -42,7 +43,12 @@ for MODEL_NAME in $MODELS_NAME; do
         --save_total_limit 1 \
         --peft_type $PEFT_TYPE \
         --init_type $init_type \
-        --num_virtual_tokens $virtual_token;
+        --num_virtual_tokens $source_token \
+        --out_embeddings $target_token \
+        --conv_bias False \
+        --conv_pool False \
+        --encoder_num_modules 2 \
+        --encoder_bottleneck_size 400;
     done;
   done;
 done;
