@@ -44,7 +44,7 @@ for MODEL_NAME in $MODELS_NAME; do
         --peft_type $PEFT_TYPE \
         --init_type $init_type \
         --num_virtual_tokens $source_token \
-        --out_embeddings $target_token \
+        --output_embeddings $target_token \
         --conv_bias False \
         --conv_pool False \
         --encoder_num_modules 2 \
