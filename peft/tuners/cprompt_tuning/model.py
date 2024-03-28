@@ -95,6 +95,17 @@ class CPromptEmbedding(BaseEmbedding):
                         )
                     )
                     
+                    if config.conv_dropout > 0:
+                        conv_layers.append(nn.Dropout(p=config.conv_dropout))
+                    if config.conv_layer_norm:
+                        conv_layers.append(nn.LayerNorm(self.token_dim))
+                    if config.conv_nonlinearity == CPromptTuningActivation.RELU:
+                        conv_layers.append(nn.ReLU())
+                    elif config.conv_nonlinearity == CPromptTuningActivation.TANH:
+                        conv_layers.append(nn.Tanh())
+                    elif config.conv_nonlinearity == CPromptTuningActivation.SIGM:
+                        conv_layers.append(nn.Sigmoid())
+                    
                     in_channels = out_channel
                     
                     if config.conv_pool:
@@ -106,55 +117,13 @@ class CPromptEmbedding(BaseEmbedding):
                             )
                         )
             
-            conv_layers.append(
-                nn.Conv1d(
-                    in_channels=in_channels, 
-                    out_channels=out_virtual_tokens,
-                    kernel_size=1,
-                    stride=1,
-                    bias=config.conv_bias,
-                )
-            )
-            
-            module = [nn.Linear(self.token_dim, config.encoder_bottleneck)]
-            
-            if config.encoder_nonlinearity == CPromptTuningActivation.RELU:
-                module.append(nn.ReLU())
-            elif config.encoder_nonlinearity == CPromptTuningActivation.TANH:
-                module.append(nn.Tanh())
-            elif config.encoder_nonlinearity == CPromptTuningActivation.SIGM:
-                module.append(nn.Sigmoid())
-            
-            module.append(nn.Linear(config.encoder_bottleneck, self.token_dim))
-            
-            if config.encoder_dropout > 0:
-                module.append(nn.Dropout(p=config.dropout))
-            if config.encoder_layer_norm:
-                module.append(nn.LayerNorm(self.token_dim))
-            
-            num_modules = config.encoder_num_modules
-            if num_modules > 2:
-                encoder_num_modules_default = CPromptTuningConfig.encoder_num_modules
-                warnings.warn(
-                    f"Since only MLP 1 and 2 layers were used in Residual Prompt Tuning (Zhengxiang et al.),"
-                    f"for MLP, the argument `encoder_num_layers` is ignored."
-                    f"Exactly {encoder_num_modules_default} MLP layers are used"
-                )
-                num_modules = encoder_num_modules_default
-            if num_modules == 2:
-                module = module + module
-            
-            self.module = nn.Sequential(*module)
             self.conv_layers = nn.Sequential(*conv_layers)
     
     def forward(self, indices):
         # Just get embeddings
         prompt_embeddings = self.embedding(indices)
         prompt_embeddings = self.conv_layers(prompt_embeddings)
-        if self.config.encoder_residual:
-            return self.module(prompt_embeddings) + prompt_embeddings
-        else:
-            return self.module(prompt_embeddings)
+        return prompt_embeddings
 
     def create_reduced_embedding(self):
         self.reduced_embedding = torch.nn.Embedding(self.out_virtual_tokens, self.token_dim)

@@ -82,35 +82,25 @@ class CPromptTuningConfig(PromptLearningConfig):
             "help": "Set this the False if you don't add max pooling to conv layers."
         }
     )
-    encoder_nonlinearity: Union[CPromptTuningActivation, str] = field(
+    conv_nonlinearity: Union[CPromptTuningActivation, str] = field(
         default=CPromptTuningActivation.RELU,
         metadata={
             "help": "The type of activation function."
         }
     )
-    encoder_layer_norm: bool = field(
+    conv_layer_norm: bool = field(
         default=True,
         metadata={
             "help": "Set this the False if you don't use layer normalization."
         }
     )
-    encoder_dropout: float = field(
+    conv_dropout: float = field(
         default=0.0,
         metadata={
             "help": "Set this 0.0 if you don't use dropout."
         }
     )
-    encoder_bottleneck: int = field(
-        default=800,
-        metadata={
-            "help": "The type of bottleneck size."
-        }
-    )
-    encoder_num_modules: int = field(
-        default=1,
-        metadata={"help": "The number of modules of the mlp."}
-    )
-    encoder_residual: int = field(
+    conv_residual: int = field(
         default=True,
         metadata={
             "help": "Set this the False, if you don't add residual connection."
