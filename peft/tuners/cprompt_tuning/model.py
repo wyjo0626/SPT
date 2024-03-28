@@ -76,57 +76,93 @@ class CPromptEmbedding(BaseEmbedding):
         
         if not config.inference_mode:
             
+            with open("./peft/tuners/cprompt_tuning/top_words.txt", "r") as f:
+                from transformers import AutoTokenizer
+                
+                tokenizer_kwargs = config.tokenizer_kwargs or {}
+                tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name_or_path, **tokenizer_kwargs)
+                top_words = f.read()
+                top_token_ids = tokenizer(top_words, add_special_tokens=False)["input_ids"]
+                num_text_tokens = len(top_token_ids)
+                if num_text_tokens > self.total_virtual_tokens:
+                    top_token_ids = top_token_ids[:self.total_virtual_tokens]
+                elif num_text_tokens < self.total_virtual_tokens:
+                    num_reps = math.ceil(self.total_virtual_tokens / num_text_tokens)
+                    top_token_ids = top_token_ids * num_reps
+                top_token_ids = top_token_ids[:self.total_virtual_tokens]
+                top_token_ids = torch.LongTensor(top_token_ids).to(word_embeddings.weight.device)
+                top_embedding_weights = word_embeddings(top_token_ids).detach().clone()
+                top_embedding_weights = top_embedding_weights.to(torch.float32)
+                self.top_embedding_weights = top_embedding_weights.cuda()
+            
             in_channels = self.total_virtual_tokens
-            conv_layers = []
+            conv_dict = nn.ModuleDict()
+            orders = []
             
             if config.conv_out_channels is not None:
                 
                 for n in range(len(config.conv_out_channels)):
                     kernel_size = config.conv_kernel_sizes[n]
                     out_channels = config.conv_out_channels[n] * config.num_transformer_submodules
+                    orders.append(str(out_channels))
                     
                     if kernel_size % 2 == 0:
                         raise ValueError("kernel size must be odd to keep the embedding token dimension.")
 
-                    conv_layers.append(
-                        nn.Conv1d(
-                            in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            stride=1,
-                            padding=kernel_size // 2,
-                            bias=config.conv_bias,
-                        )
-                    )
-                    
-                    if config.conv_dropout > 0:
-                        conv_layers.append(nn.Dropout(p=config.conv_dropout))
-                    if config.conv_layer_norm:
-                        conv_layers.append(nn.LayerNorm(self.token_dim))
-                    if config.conv_nonlinearity == CPromptTuningActivation.RELU:
-                        conv_layers.append(nn.ReLU())
-                    elif config.conv_nonlinearity == CPromptTuningActivation.TANH:
-                        conv_layers.append(nn.Tanh())
-                    elif config.conv_nonlinearity == CPromptTuningActivation.SIGM:
-                        conv_layers.append(nn.Sigmoid())
-                    
-                    in_channels = out_channels
-                    
-                    if config.conv_pool:
+                    for i in range(2):
+                        conv_layers = []
                         conv_layers.append(
-                            nn.MaxPool1d(
+                            nn.Conv1d(
+                                in_channels=in_channels,
+                                out_channels=out_channels,
                                 kernel_size=kernel_size,
                                 stride=1,
-                                padding=kernel_size // 2
+                                padding=kernel_size // 2,
+                                bias=config.conv_bias,
                             )
                         )
+                        
+                        if config.conv_dropout > 0:
+                            conv_layers.append(nn.Dropout(p=config.conv_dropout))
+                        if config.conv_layer_norm:
+                            conv_layers.append(nn.LayerNorm(self.token_dim))
+                        if config.conv_nonlinearity == CPromptTuningActivation.RELU:
+                            conv_layers.append(nn.ReLU())
+                        elif config.conv_nonlinearity == CPromptTuningActivation.TANH:
+                            conv_layers.append(nn.Tanh())
+                        elif config.conv_nonlinearity == CPromptTuningActivation.SIGM:
+                            conv_layers.append(nn.Sigmoid())
+                        
+                        if config.conv_pool:
+                            conv_layers.append(
+                                nn.MaxPool1d(
+                                    kernel_size=kernel_size,
+                                    stride=1,
+                                    padding=kernel_size // 2
+                                )
+                            )
+                        
+                        if i == 0:
+                            conv_dict[f"non-static-{out_channels}"] = nn.Sequential(*conv_layers)
+                        else:
+                            conv_dict[f"static-{out_channels}"] = nn.Sequential(*conv_layers)
+                        
+                    in_channels = out_channels
             
-            self.conv_layers = nn.Sequential(*conv_layers)
+            self.conv_dict = conv_dict
+            self.orders = orders
     
     def forward(self, indices):
         # Just get embeddings
         prompt_embeddings = self.embedding(indices)
-        prompt_embeddings = self.conv_layers(prompt_embeddings)
+        top_embeddings = self.top_embedding_weights
+        
+        for order in self.orders:
+            prompt_embeddings = self.conv_dict[f"non-static-{order}"](prompt_embeddings)
+            top_embeddings = self.conv_dict[f"static-{order}"](top_embeddings)
+            
+            prompt_embeddings = prompt_embeddings + top_embeddings
+        
         return prompt_embeddings
 
     def create_reduced_embedding(self):
