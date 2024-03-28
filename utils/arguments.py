@@ -348,7 +348,7 @@ class DynamicPeftArguments:
             "help": "The output channel arguments to use for nn.Conv1d initialization."
         }
     )
-    conv_out_channels: Optional[Union[List[int]]] = field(
+    conv_out_channels: Union[List[int]] = field(
         default=None,
         metadata={
             "help": "List of convolution layer out_channels to create convolution."
@@ -356,12 +356,11 @@ class DynamicPeftArguments:
             "If you don't add convolution layer, then only add 1x1 convolution."
         }
     )
-    conv_kernel_sizes: Optional[Union[List[int]]] = field(
+    conv_kernel_sizes: Union[List[str]] = field(
         default=None,
         metadata={
-            "help": "List of convolution layer kernel to create convolution."
-            "For example, [3, 5, 7]"
-            "If you don't add convolution layer, then only add 1x1 convolution."
+            "help": "List of convolution layer kernel or bottleneck to create convolution."
+            "For example, [3, 5, 7, 'bottleneck']"
         }
     )
     conv_bias: bool = field(

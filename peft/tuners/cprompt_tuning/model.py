@@ -21,6 +21,66 @@ from .config import CPromptTuningActivation, CPromptTuningConfig
 from peft.tuners.tuners_utils import BaseEmbedding
 
 
+class Bottleneck(nn.Module):
+    """
+    Bottleneck class for convolutional prompt. Bottleneck can have a residual connection.
+    
+    args:
+        in_channels (`int`)
+        out_channels (`int`)
+        config ([`CPromptTuningConfig`]): The configuration of the convolutional prompt embedding.
+    """
+    def __init__(self, in_channels, out_channels, config):
+        super().__init__()
+        
+        self.conv1 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=1,
+            stride=1,
+            bias=config.conv_bias,
+        )
+        self.norm1 = nn.LayerNorm(config.token_dim)
+        self.conv2 = nn.Conv1d(
+            in_channels=out_channels,
+            out_channels=out_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=config.conv_bias,
+        )
+        self.norm2 = nn.LayerNorm(config.token_dim)
+        self.conv3 = nn.Conv1d(
+            in_channels=out_channels,
+            out_channels=in_channels,
+            kernel_size=1,
+            stride=1,
+            bias=config.conv_bias,
+        )
+        self.norm3 = nn.LayerNorm(config.token_dim)
+        self.relu = nn.ReLU()
+        self.config = config
+    
+    def forward(self, x):
+        identity = x
+        
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.norm3(out)
+        if self.config.conv_residual:
+            out += identity
+        out = self.relu(out)
+        
+        return out
+
+
 class CPromptEmbedding(BaseEmbedding):
     """
     The model to encode virtual tokens into prompt embeddings.
@@ -85,41 +145,49 @@ class CPromptEmbedding(BaseEmbedding):
                     kernel_size = config.conv_kernel_sizes[n]
                     out_channels = config.conv_out_channels[n] * config.num_transformer_submodules
                     
-                    if kernel_size % 2 == 0:
+                    if isinstance(kernel_size, str) and kernel_size != "bottleneck":
+                        raise ValueError("kernel must be bottleneck")
+                    if isinstance(kernel_size, int) and kernel_size % 2 == 0:
                         raise ValueError("kernel size must be odd to keep the embedding token dimension.")
 
-                    conv_layers.append(
-                        nn.Conv1d(
-                            in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            stride=1,
-                            padding=kernel_size // 2,
-                            bias=config.conv_bias,
-                        )
-                    )
-                    
-                    if config.conv_dropout > 0:
-                        conv_layers.append(nn.Dropout(p=config.conv_dropout))
-                    if config.conv_layer_norm:
-                        conv_layers.append(nn.LayerNorm(self.token_dim))
-                    if config.conv_nonlinearity == CPromptTuningActivation.RELU:
-                        conv_layers.append(nn.ReLU())
-                    elif config.conv_nonlinearity == CPromptTuningActivation.TANH:
-                        conv_layers.append(nn.Tanh())
-                    elif config.conv_nonlinearity == CPromptTuningActivation.SIGM:
-                        conv_layers.append(nn.Sigmoid())
-                    
-                    in_channels = out_channels
-                    
-                    if config.conv_pool:
+                    if isinstance(kernel_size, str):
+                        bottleneck = Bottleneck(in_channels, out_channels, config)
+                        conv_layers.append(bottleneck)
+                    elif isinstance(kernel_size, int):
                         conv_layers.append(
-                            nn.MaxPool1d(
+                            nn.Conv1d(
+                                in_channels=in_channels,
+                                out_channels=out_channels,
                                 kernel_size=kernel_size,
                                 stride=1,
-                                padding=kernel_size // 2
+                                padding=kernel_size // 2,
+                                bias=config.conv_bias,
                             )
                         )
+                        
+                        if config.conv_dropout > 0:
+                            conv_layers.append(nn.Dropout(p=config.conv_dropout))
+                        if config.conv_layer_norm:
+                            conv_layers.append(nn.LayerNorm(self.token_dim))
+                        if config.conv_nonlinearity == CPromptTuningActivation.RELU:
+                            conv_layers.append(nn.ReLU())
+                        elif config.conv_nonlinearity == CPromptTuningActivation.TANH:
+                            conv_layers.append(nn.Tanh())
+                        elif config.conv_nonlinearity == CPromptTuningActivation.SIGM:
+                            conv_layers.append(nn.Sigmoid())
+                        
+                        in_channels = out_channels
+                        
+                        if config.conv_pool:
+                            conv_layers.append(
+                                nn.MaxPool1d(
+                                    kernel_size=kernel_size,
+                                    stride=1,
+                                    padding=kernel_size // 2
+                                )
+                            )
+                    else:
+                        raise ValueError("Not Implemented")
             
             self.conv_layers = nn.Sequential(*conv_layers)
     

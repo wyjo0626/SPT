@@ -54,7 +54,7 @@ class CPromptTuningConfig(PromptLearningConfig):
             "help": "The output channel arguments to use for nn.Conv1d initialization."
         }
     )
-    conv_out_channels: Optional[Union[List[int]]] = field(
+    conv_out_channels: Union[List[int]] = field(
         default=None,
         metadata={
             "help": "List of convolution layer out_channels to create convolution."
@@ -62,12 +62,11 @@ class CPromptTuningConfig(PromptLearningConfig):
             "If you don't add convolution layer, then only add 1x1 convolution."
         }
     )
-    conv_kernel_sizes: Optional[Union[List[int]]] = field(
+    conv_kernel_sizes: Union[List[str]] = field(
         default=None,
         metadata={
-            "help": "List of convolution layer kernel to create convolution."
-            "For example, [3, 5, 7]"
-            "If you don't add convolution layer, then only add 1x1 convolution."
+            "help": "List of convolution layer kernel or bottleneck to create convolution."
+            "For example, [3, 5, 7, 'bottleneck']"
         }
     )
     conv_bias: bool = field(
@@ -110,6 +109,7 @@ class CPromptTuningConfig(PromptLearningConfig):
     def __post_init__(self):
         self.peft_type = PeftType.CPROMPT_TUNING
 
+        self.conv_kernel_sizes = [int(item) if item.isdigit() else item for item in self.conv_kernel_sizes]
         if isinstance(self.conv_out_channels, list):
             if not isinstance(self.conv_kernel_sizes, list):
                 raise ValueError(f"convolution layers list is not matched with kernel size list")
