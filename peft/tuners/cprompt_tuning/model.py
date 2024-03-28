@@ -70,6 +70,10 @@ class CPromptEmbedding(BaseEmbedding):
         self.out_virtual_tokens = out_virtual_tokens
         self.config = config
         
+        # for convolution fixed Reproducibility
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
         if not config.inference_mode:
             
             in_channels = self.total_virtual_tokens
