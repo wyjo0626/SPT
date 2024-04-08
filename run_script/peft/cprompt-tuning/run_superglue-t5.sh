@@ -20,7 +20,7 @@ for MODEL_NAME in $MODELS_NAME; do
       if test "$DATASET_NAME" = "multirc"; then max_seq_length=348; fi
       python run.py \
         --model_name_or_path $MODEL_NAME \
-        --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$seed-C$MIXTURE_TYPE-$target_token-token-conv-32_bottle-16_3-10_1 \
+        --run_name $TASK_NAME-$DATASET_NAME-$MODEL_NAME-$lr-$seed-C$MIXTURE_TYPE-$target_token-token-conv-32_bottle-32_3-10_1 \
         --task_name $TASK_NAME \
         --dataset_name $DATASET_NAME \
         --do_train \
@@ -29,7 +29,7 @@ for MODEL_NAME in $MODELS_NAME; do
         --per_device_train_batch_size $bs \
         --per_device_eval_batch_size $bs \
         --max_seq_length $max_seq_length \
-        --output_dir checkpoints/PEFT/C$C$MIXTURE_TYPE/$MODEL_NAME/$TASK_NAME-$DATASET_NAME-$lr-$seed-$target_token-token-conv-32_bottle-16_3-10_1/ \
+        --output_dir checkpoints/PEFT/C$MIXTURE_TYPE/$MODEL_NAME/$TASK_NAME-$DATASET_NAME-$lr-$seed-$target_token-token-conv-32_bottle-32_3-10_1/ \
         --overwrite_output_dir \
         --seed $seed \
         --learning_rate $lr \
@@ -46,7 +46,7 @@ for MODEL_NAME in $MODELS_NAME; do
         --init_type $init_type \
         --num_virtual_tokens $source_token \
         --output_embeddings $target_token \
-        --conv_out_channels 32 16 10 \
+        --conv_out_channels 32 32 10 \
         --conv_kernel_sizes bottleneck 3 1 \
         --conv_bias True \
         --prompt_tuning_type $MIXTURE_TYPE;
