@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .config import CPromptTuningConfig, CPromptTuningActivation
+from .config import CPromptTuningConfig, CPromptTuningActivation, CPromptTuningMixture, CPromptTuningConvolutionType, CPromptTuningReparameterizationType
 from .model import CPromptEmbedding
 
 

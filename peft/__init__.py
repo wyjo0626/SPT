@@ -58,6 +58,9 @@ from .tuners import (
     RPromptEmbedding,
     CPromptTuningConfig,
     CPromptTuningActivation,
+    CPromptTuningMixture,
+    CPromptTuningConvolutionType,
+    CPromptTuningReparameterizationType,
     CPromptEmbedding,
 )
 from .utils import (

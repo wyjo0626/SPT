@@ -22,4 +22,4 @@ from .residual_prompt_tuning import ResidualPromptTuningConfig, ResidualPromptTu
 from .bitfit import BitFitConfig, BitFitModel
 from .xprompt_tuning import XPromptEmbedding, XPromptTuningConfig
 from .rprompt_tuning import RPromptEmbedding, RPromptTuningConfig
-from .cprompt_tuning import CPromptEmbedding, CPromptTuningConfig, CPromptTuningActivation
+from .cprompt_tuning import CPromptEmbedding, CPromptTuningConfig, CPromptTuningActivation, CPromptTuningMixture, CPromptTuningConvolutionType, CPromptTuningReparameterizationType

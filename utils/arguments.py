@@ -9,6 +9,9 @@ from peft import (
     PeftType, 
     InitType,
     CPromptTuningActivation,
+    CPromptTuningMixture,
+    CPromptTuningConvolutionType,
+    CPromptTuningReparameterizationType,
     LoftQConfig, 
     PromptEncoderReparameterizationType,
     ResidualPromptTuningReparameterizationType
@@ -342,13 +345,17 @@ class DynamicPeftArguments:
     )
     
     # CPromptTuningConfig
+    conv_type: Union[str, CPromptTuningConvolutionType] = field(
+        default=CPromptTuningConvolutionType.DEFAULT,
+        metadata={"help": "Convolutional Layer type"}
+    )
     output_embeddings: Optional[int] = field(
         default=10,
         metadata={
             "help": "The output channel arguments to use for nn.Conv1d initialization."
         }
     )
-    conv_out_channels: Optional[Union[List[int]]] = field(
+    conv_out_channels: Union[List[int]] = field(
         default=None,
         metadata={
             "help": "List of convolution layer out_channels to create convolution."
@@ -356,12 +363,11 @@ class DynamicPeftArguments:
             "If you don't add convolution layer, then only add 1x1 convolution."
         }
     )
-    conv_kernel_sizes: Optional[Union[List[int]]] = field(
+    conv_kernel_sizes: Union[List[str]] = field(
         default=None,
         metadata={
-            "help": "List of convolution layer kernel to create convolution."
-            "For example, [3, 5, 7]"
-            "If you don't add convolution layer, then only add 1x1 convolution."
+            "help": "List of convolution layer kernel or bottleneck to create convolution."
+            "For example, [3, 5, 7, 'bottleneck']"
         }
     )
     conv_bias: bool = field(
@@ -399,6 +405,44 @@ class DynamicPeftArguments:
         metadata={
             "help": "Set this the False, if you don't add residual connection."
         }
+    )
+    prompt_tuning_type: Union[str, CPromptTuningMixture] = field(
+        default=CPromptTuningMixture.PROMPT_TUNING,
+        metadata={"help": "prompt tuning type"}
+    )
+    encoder_reparameterization_type: Union[str, CPromptTuningReparameterizationType] = field(
+        default=CPromptTuningReparameterizationType.MLP,
+        metadata={"help": "How to reparameterize the prompt encoder"}
+    )
+    encoder_nonlinearity: Union[CPromptTuningActivation, str] = field(
+        default=CPromptTuningActivation.RELU,
+        metadata={
+            "help": "The type of activation function."
+        }
+    )
+    encoder_bottleneck_size: int = field(
+        default=400,
+        metadata={"help": "The bottleneck size of the mlp."}
+    )
+    encoder_num_layers: int = field(
+        default=2,
+        metadata={"help": "The number of layers of the mlp."}
+    )
+    encoder_dropout: int = field(
+        default=0.0,
+        metadata={"help": "The dropout of the mlp."}
+    )
+    encoder_layer_norm: bool = field(
+        default=True,
+        metadata={"help": "Set this the False if you don't use layer normalization"}
+    )
+    encoder_separate: bool = field(
+        default=False,
+        metadata={"help": "Use separate MLP for each prompt tokens"}
+    )
+    encoder_residual: bool = field(
+        default=True,
+        metadata={"help": "Set this the False if you don't use residual connection."}
     )
 
 
