@@ -91,13 +91,13 @@ class CPromptTuningConfig(PromptLearningConfig):
         }
     )
     conv_bias: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Set this the False if you don't add bias to conv layers."
         }
     )
     conv_pool: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Set this the False if you don't add max pooling to conv layers."
         }
