@@ -392,6 +392,8 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
         if config.num_transformer_submodules is None:
             config.num_transformer_submodules = 2 if config.task_type == TaskType.SEQ_2_SEQ_LM else 1
+        # if config.peft_type == PeftType.CPROMPT_TUNING:
+        #     config.num_transformer_submodules = 1
 
         for named_param, value in list(transformer_backbone.named_parameters()):
             # for ZeRO-3, the tensor is sharded across accelerators and deepspeed modifies it to a tensor with shape [0]
@@ -1434,9 +1436,14 @@ class PeftModelForSeq2SeqLM(PeftModel):
                     )
                 kwargs["attention_mask"] = torch.cat((prefix_attention_mask, attention_mask), dim=1)
             
+            if peft_config.peft_type == PeftType.CPROMPT_TUNING:
+                num_virtual_tokens = peft_config.output_embeddings
+            else:
+                num_virtual_tokens = peft_config.num_virtual_tokens
+            
             prompts = self.get_prompt(batch_size=batch_size)
             prompts = prompts.to(inputs_embeds.dtype)
-            inputs_embeds = torch.cat((prompts[:, : peft_config.num_virtual_tokens], inputs_embeds), dim=1)
+            inputs_embeds = torch.cat((prompts[:, : num_virtual_tokens], inputs_embeds), dim=1)
             
             return self.base_model(
                 inputs_embeds=inputs_embeds,
@@ -1541,7 +1548,12 @@ class PeftModelForSeq2SeqLM(PeftModel):
                     prompts = self.get_prompt(batch_size=batch_size, task_ids=kwargs.pop("task_ids", None))
                     prompts = prompts.to(inputs_embeds.dtype)
 
-                    inputs_embeds = torch.cat((prompts[:, : peft_config.num_virtual_tokens], inputs_embeds), dim=1)
+                    if peft_config.peft_type == PeftType.CPROMPT_TUNING:
+                        num_virtual_tokens = peft_config.output_embeddings
+                    else:
+                        num_virtual_tokens = peft_config.num_virtual_tokens
+
+                    inputs_embeds = torch.cat((prompts[:, : num_virtual_tokens], inputs_embeds), dim=1)
                     kwargs["inputs_embeds"] = inputs_embeds
                     
                     if "attention_mask" in kwargs:
