@@ -413,7 +413,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         if config.peft_type == PeftType.PROMPT_TUNING:
             prompt_encoder = PromptEmbedding(config, self.word_embeddings)
         elif config.peft_type == PeftType.P_TUNING:
-            prompt_encoder = PromptEncoder(config)
+            prompt_encoder = PromptEncoder(config, self.word_embeddings)
         elif config.peft_type == PeftType.PREFIX_TUNING:
             prompt_encoder = PrefixEncoder(config)
         elif config.peft_type == PeftType.RESIDUAL_PROMPT_TUNING:

@@ -129,6 +129,9 @@ if __name__ == "__main__":
     if training_args.do_train:
         train(trainer, training_args.resume_from_checkpoint, last_checkpoint)
     
+    if peft_args.peft_type is not None:
+        trainer.model.active_peft_config.inference_mode = True
+    
     if training_args.do_eval:
         evaluate(trainer)
     
