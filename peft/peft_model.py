@@ -750,6 +750,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             PeftType.CPROMPT_TUNING,
         ] and not hasattr(self.prompt_encoder[adapter_name], "reduced_embedding"):
             self.prompt_encoder[adapter_name].create_reduced_embedding()
+            self.prompt_encoder[adapter_name].reduced_embedding.to(self.device)
         
         if self.peft_config[adapter_name].peft_type in [
             PeftType.XPROMPT_TUNING,
