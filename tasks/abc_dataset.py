@@ -133,12 +133,17 @@ class AbstractDataset(ABC):
             dataset = self.tokenized_dataset[split_key["validation"]]
             indices = self.get_split_indices(split, dataset, validation_size=len(dataset) // 2)
             dataset = self.subsample(dataset, n_obs, indices)
-        # For larger datasets (n_samples > 10K), we divide training set into 1K as
+        # For larger datasets (n_samples > 10K), we divide training set into 1K and
+        # For larger datasets (n_samples > 100K), we divide training set into 10K as
         # validation and the rest as training set, keeping the original validation
         # set as the test set.
         elif split_validation_test and is_small == False and split != "test":
             dataset = self.tokenized_dataset[split_key["train"]]
-            indices = self.get_split_indices(split, dataset, validation_size=1000)
+            if len(dataset) > 100000:
+                validation_size = 10000
+            else:
+                validation_size = 1000
+            indices = self.get_split_indices(split, dataset, validation_size=validation_size)
             dataset = self.subsample(dataset, n_obs, indices)
         elif split_validation_test and is_small == False and split == "test":
             dataset = self.tokenized_dataset[split_key["validation"]]
