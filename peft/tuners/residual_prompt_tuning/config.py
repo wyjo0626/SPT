@@ -45,11 +45,11 @@ class ResidualPromptTuningConfig(PromptLearningConfig):
         metadata={"help": "How to reparameterize of the prompt."}
     )
     encoder_bottleneck_size: int = field(
-        default=800,
+        default=400,
         metadata={"help": "The bottleneck size of the mlp."}
     )
     encoder_num_layers: int = field(
-        default=1,
+        default=2,
         metadata={"help": "The number of layers of the mlp."}
     )
     encoder_dropout: int = field(
