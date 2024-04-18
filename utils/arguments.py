@@ -315,8 +315,8 @@ class DynamicPeftArguments:
     encoder_reparameterization_type: Union[str, ResidualPromptTuningReparameterizationType] = field(
         default=ResidualPromptTuningReparameterizationType.MLP, metadata={"help": "How to reparameterize of the prompt."}
     )
-    encoder_bottleneck_size: int = field(default=800, metadata={"help": "The bottleneck size of the mlp."})
-    encoder_num_layers: int = field(default=1, metadata={"help": "The number of layers of the mlp."})
+    encoder_bottleneck_size: int = field(default=400, metadata={"help": "The bottleneck size of the mlp."})
+    encoder_num_layers: int = field(default=2, metadata={"help": "The number of layers of the mlp."})
     encoder_dropout: int = field(default=0.0, metadata={"help": "The dropout of the mlp."})
     encoder_layer_norm: bool = field(default=True, metadata={"help": "Set this the False if you don't use layer normalization"})
     encoder_separate: bool = field(default=False, metadata={"help": "Use separate MLP for each prompt tokens"})
