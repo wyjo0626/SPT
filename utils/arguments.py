@@ -14,7 +14,9 @@ from peft import (
     CPromptTuningReparameterizationType,
     LoftQConfig, 
     PromptEncoderReparameterizationType,
-    ResidualPromptTuningReparameterizationType
+    ResidualPromptTuningReparameterizationType,
+    EPTReparameterizationType,
+    EPTActivationType,
 )
 
 from tasks.utils import *
@@ -443,6 +445,35 @@ class DynamicPeftArguments:
     encoder_residual: bool = field(
         default=True,
         metadata={"help": "Set this the False if you don't use residual connection."}
+    )
+    # EPromptTuningConfig
+    ept_reparameterization_type: Union[str, EPTReparameterizationType] = field(
+        default=EPTReparameterizationType.MLP,
+        metadata={"help": "How to reparameterize the ept encoder"},
+    )
+    ept_nonlinearity: Union[EPTActivationType, str] = field(
+        default=EPTActivationType.NONE,
+        metadata={"help": "the type of activation function."}
+    )
+    ept_hidden_size: int = field(
+        default=1,
+        metadata={"help": "The hidden size of ept encoder"},
+    )
+    ept_num_layers: int = field(
+        default=1,
+        metadata={"help": "The number of layers of the ept encoder"},
+    )
+    ept_dropout: float = field(
+        default=0.0,
+        metadata={"help": "The dropout of the ept encoder"},
+    )
+    ept_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "Set this the True if you use layer normalization"}
+    )
+    ept_residual: bool = field(
+        default=False,
+        metadata={"help": "Set this the True if you use residual connection."}
     )
 
 

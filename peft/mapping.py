@@ -43,6 +43,7 @@ from .tuners import (
     XPromptTuningConfig,
     RPromptTuningConfig,
     CPromptTuningConfig,
+    EPromptTuningConfig,
 )
 from .utils import _prepare_prompt_learning_config
 
@@ -72,6 +73,7 @@ PEFT_TYPE_TO_CONFIG_MAPPING: Dict[str, PeftConfig] = {
     "XPROMPT_TUNING": XPromptTuningConfig,
     "RPROMPT_TUNING": RPromptTuningConfig,
     "CPROMPT_TUNING": CPromptTuningConfig,
+    "EPROMPT_TUNING": EPromptTuningConfig,
 }
 
 PEFT_TYPE_TO_TUNER_MAPPING = {

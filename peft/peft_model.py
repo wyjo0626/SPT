@@ -49,6 +49,7 @@ from .tuners import (
     XPromptEmbedding,
     RPromptEmbedding,
     CPromptEmbedding,
+    EPTEmbedding,
 )
 from .utils import (
     SAFETENSORS_WEIGHTS_NAME,
@@ -84,6 +85,7 @@ PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.XPROMPT_TUNING: XPromptEmbedding,
     PeftType.RPROMPT_TUNING: RPromptEmbedding,
     PeftType.CPROMPT_TUNING: CPromptEmbedding,
+    PeftType.EPROMPT_TUNING: EPTEmbedding,
 }
 
 
@@ -424,6 +426,8 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             prompt_encoder = RPromptEmbedding(config, self.word_embeddings)
         elif config.peft_type == PeftType.CPROMPT_TUNING:
             prompt_encoder = CPromptEmbedding(config, self.word_embeddings)
+        elif config.peft_type == PeftType.EPROMPT_TUNING:
+            prompt_encoder = EPTEmbedding(config, self.word_embeddings)
         else:
             raise ValueError("Not supported")
 
@@ -1381,6 +1385,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
                 PeftType.XPROMPT_TUNING,
                 PeftType.RPROMPT_TUNING,
                 PeftType.CPROMPT_TUNING,
+                PeftType.EPROMPT_TUNING,
             ]:
                 decoder_attention_mask = torch.cat((prefix_attention_mask, decoder_attention_mask), dim=1)
 
@@ -1417,6 +1422,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
             PeftType.XPROMPT_TUNING,
             PeftType.RPROMPT_TUNING,
             PeftType.CPROMPT_TUNING,
+            PeftType.EPROMPT_TUNING,
         ]:
             if inputs_embeds is None:
                 inputs_embeds = self.word_embeddings(input_ids)
@@ -1534,6 +1540,7 @@ class PeftModelForSeq2SeqLM(PeftModel):
                     PeftType.XPROMPT_TUNING,
                     PeftType.RPROMPT_TUNING,
                     PeftType.CPROMPT_TUNING,
+                    PeftType.EPROMPT_TUNING,
                 ]:
                     kwargs = deepcopy(kwargs)
                     

@@ -23,3 +23,4 @@ from .bitfit import BitFitConfig, BitFitModel
 from .xprompt_tuning import XPromptEmbedding, XPromptTuningConfig
 from .rprompt_tuning import RPromptEmbedding, RPromptTuningConfig
 from .cprompt_tuning import CPromptEmbedding, CPromptTuningConfig, CPromptTuningActivation, CPromptTuningMixture, CPromptTuningConvolutionType, CPromptTuningReparameterizationType
+from .eprompt_tuning import EPTEmbedding, EPromptTuningConfig, EPTReparameterizationType, EPTActivationType

@@ -39,6 +39,7 @@ from peft import (
     XPromptTuningConfig,
     RPromptTuningConfig,
     CPromptTuningConfig,
+    EPromptTuningConfig,
 )
 
 AUTO_MODEL = {
@@ -61,6 +62,7 @@ AUTO_PEFT = {
     PeftType.XPROMPT_TUNING: XPromptTuningConfig,
     PeftType.RPROMPT_TUNING: RPromptTuningConfig,
     PeftType.CPROMPT_TUNING: CPromptTuningConfig,
+    PeftType.EPROMPT_TUNING: EPromptTuningConfig,
 }
 
 logger = logging.getLogger(__name__)

@@ -126,6 +126,12 @@ class CPromptTuningConfig(PromptLearningConfig):
             "help": "Set this the False, if you don't add residual connection."
         }
     )
+    conv_linear: bool = field(
+        default=True,
+        metadata={
+            "help": "Set this the False, if you don't add linear"
+        }
+    )
     prompt_tuning_type: Union[str, CPromptTuningMixture] = field(
         default=CPromptTuningMixture.PROMPT_TUNING,
         metadata={"help": "prompt tuning type"}
