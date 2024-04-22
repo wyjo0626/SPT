@@ -75,6 +75,7 @@ class EPTEmbedding(BaseEmbedding):
         num_layers = config.ept_num_layers
         dropout = config.ept_dropout
         layer_norm = config.ept_layer_norm
+        bias = config.ept_bias
         self.residual = config.ept_residual
         
         if not config.inference_mode:
@@ -91,8 +92,6 @@ class EPTEmbedding(BaseEmbedding):
             self.encoder = []
             
             if self.encoder_type == EPTReparameterizationType.LSTM:
-                lstm_dropout = config.encoder_dropout
-                num_layers = config.encoder_num_layers
                 # LSTM
                 self.lstm_head = nn.LSTM(
                     input_size=self.token_dim,
@@ -101,18 +100,19 @@ class EPTEmbedding(BaseEmbedding):
                     dropout=dropout,
                     bidirectional=True,
                     batch_first=True,
+                    bias=bias
                 )
                 
-                self.encoder.append(nn.Linear(self.token_dim, hidden_size))
+                self.encoder.append(nn.Linear(self.token_dim, hidden_size, bias=bias))
                 if nonlinear: self.encoder.append(nonlinear)
-                self.encoder.append(nn.Linear(hidden_size, self.token_dim))
+                self.encoder.append(nn.Linear(hidden_size, self.token_dim, bias=bias))
             elif self.encoder_type == EPTReparameterizationType.TRANSFORMER:
-                encoder_layer = nn.TransformerEncoderLayer(d_model=self.token_dim, nhead=2, dropout=self.dropout)
+                encoder_layer = nn.TransformerEncoderLayer(d_model=self.token_dim, nhead=2, dropout=dropout, activation=nonlinear)
                 self.encoder.append(nn.TransformerEncoder(encoder_layer, num_layers=num_layers))
             elif self.encoder_type == EPTReparameterizationType.MLP:
-                self.encoder.append(nn.Linear(self.token_dim, hidden_size))
+                self.encoder.append(nn.Linear(self.token_dim, hidden_size, bias=bias))
                 if nonlinear: self.encoder.append(nonlinear)
-                self.encoder.append(nn.Linear(hidden_size, self.token_dim))
+                self.encoder.append(nn.Linear(hidden_size, self.token_dim, bias=bias))
                 
                 if dropout > 0: self.encoder.append(nn.Dropout(p=dropout))
                 if layer_norm: self.encoder.append(nn.LayerNorm(self.token_dim))

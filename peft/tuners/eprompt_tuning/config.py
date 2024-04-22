@@ -67,6 +67,10 @@ class EPromptTuningConfig(PromptLearningConfig):
         default=0.0,
         metadata={"help": "The dropout of the ept encoder"},
     )
+    ept_bias: bool = field(
+        default=False,
+        metadata={"help": "Set this the True if you use layer bias"}
+    )
     ept_layer_norm: bool = field(
         default=False,
         metadata={"help": "Set this the True if you use layer normalization"}
