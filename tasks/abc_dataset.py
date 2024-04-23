@@ -172,7 +172,7 @@ class AbstractDataset(ABC):
             
     
     def set_max_target_length(self, default_max_length):
-        if self.labels_list is not None and default_data_collator is not None:
+        if self.labels_list is not None and default_data_collator is None:
             return max([len(self.tokenizer.encode(str(label))) for label in list(self.label2id.values())])
         return default_max_length
     
