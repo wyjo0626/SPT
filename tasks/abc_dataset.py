@@ -66,6 +66,15 @@ class AbstractDataset(ABC):
                 self.raw_datasets = load_dataset(self.name)
             elif self.name in ["newsqa", "searchqa", "hotpotqa", "nq"]:
                 self.raw_datasets = load_dataset("lucadiliello/" + (self.name if self.name != "nq" else "naturalquestionsshortqa"))
+        elif self.task == "others":
+            if self.name in ["yelp", "amazon"]:
+                self.raw_datasets = load_dataset(self.name + "_polarity")
+            elif self.name == "scitail":
+                self.raw_datasets = load_dataset("scitail", "snli_format")
+            elif self.name == "winogrande":
+                self.raw_datasets = load_dataset("winogrande", "winogrande_xl")
+            elif self.name == "paws":
+                self.raw_datasets = load_dataset("paws", "labeled_final")
         else:
             raise NotImplementedError
 
@@ -164,8 +173,8 @@ class AbstractDataset(ABC):
     
     def set_max_target_length(self, default_max_length):
         if self.labels_list is not None:
-            self.max_target_length = max([len(self.tokenizer.encode(label)) for label in self.labels_list])
-        self.max_target_length = default_max_length
+            return max([len(self.tokenizer.encode(str(label))) for label in list(self.label2id.values())])
+        return default_max_length
     
     def seq2seq_format(self,
                        sources: List[str],

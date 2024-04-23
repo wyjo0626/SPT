@@ -3,6 +3,7 @@ import evaluate
 import numpy as np
 import logging
 import functools
+import collections
 
 from tasks.abc_dataset import AbstractDataset
 from utils.general import colorstr, colorformat, emojis
@@ -13,7 +14,7 @@ task_to_keys = {
     "cb": ("premise", "hypothesis"),                #     250   no test
     "rte": ("premise", "hypothesis"),               #   2,490   no test
     "wic": ("sentence1", "sentence2"),              #   5,428   no test
-    "wsc": ("span1_text", "span2_text"),      #     554   no test
+    "wsc": ("span1_text", "span2_text"),            #     554   no test
     "copa": (None, None),                           #     400   no test
     "record": (None, None),                         # 100,730   no test
     "multirc": ("paragraph", "question_answer")     #  27,243   no test
@@ -48,19 +49,19 @@ class SuperGlueDataset(AbstractDataset):
         # labels
         if data_args.dataset_name == "record":
             self.num_labels = 2
-            self.label_list = ["0", "1"]
+            self.labels_list = ["0", "1"]
         else:
-            self.label_list = self.raw_datasets["train"].features["label"].names
-            self.num_labels = len(self.label_list)
+            self.labels_list = self.raw_datasets["train"].features["label"].names
+            self.num_labels = len(self.labels_list)
         
-        # Set max_target_length by label_list
-        self.set_max_target_length(training_args.generation_max_length)
+        self.label2id = {l: i for i, l in enumerate(self.labels_list)}
+        self.id2label = {id: label for label, id in self.label2id.items()}
+        
+        # Set max_target_length by labels_list
+        self.max_target_length = self.set_max_target_length(training_args.generation_max_length)
         
         # Preprocessing the raw_datasets
         self.sentence1_key, self.sentence2_key = task_to_keys[data_args.dataset_name]
-        
-        self.label2id = {l: i for i, l in enumerate(self.label_list)}
-        self.id2label = {id: label for label, id in self.label2id.items()}
         
         # Check dataset
         logger.info(f"{colorstr('bright_yellow', 'bold', 'Check Dataset')}")

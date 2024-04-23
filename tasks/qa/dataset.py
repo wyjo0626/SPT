@@ -53,16 +53,20 @@ class QADataset(AbstractDataset):
         # labels
         if self.name == "piqa":
             self.num_labels = 2
-            self.label_list = ["0", "1"]
+            self.labels_list = ["0", "1"]
         elif self.name == "commonsense_qa":
             self.num_labels = 5
-            self.label_list = ["A", "B", "C", "D", "E"]
+            self.labels_list = ["A", "B", "C", "D", "E"]
         elif self.name == "social_i_qa":
             self.num_labels = 3
-            self.label_list = ["0", "1", "2"]
+            self.labels_list = ["0", "1", "2"]
 
-        # Set max_target_length by label_list
-        self.set_max_target_length(training_args.generation_max_length)
+        if self.name in ["piqa", "commonsense_qa", "social_i_qa"]:
+            self.label2id = {l: i for i, l in enumerate(self.labels_list)}
+            self.id2label = {id: label for label, id in self.label2id.items()}
+
+        # Set max_target_length by labels_list
+        self.max_target_length = self.set_max_target_length(training_args.generation_max_length)
         
         # Preprocessing the raw_datasets
         if self.name in [
@@ -75,10 +79,6 @@ class QADataset(AbstractDataset):
         elif self.name == "social_i_qa":
             self.sentence1_key, self.sentence2_key, self.sentence3_key, \
                 self.sentence4_key, self.sentence5_key, self.sentence6_key = task_to_keys[self.name]
-
-        if self.name in ["piqa", "commonsense_qa", "social_i_qa"]:
-            self.label2id = {l: i for i, l in enumerate(self.label_list)}
-            self.id2label = {id: label for label, id in self.label2id.items()}
         
         # Check dataset
         logger.info(f"{colorstr('bright_yellow', 'bold', 'Check Dataset')}")

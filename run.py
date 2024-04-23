@@ -108,6 +108,10 @@ if __name__ == "__main__":
         assert data_args.dataset_name.lower() in QA_DATASETS
         from tasks.qa.dataset import QADataset
         dataset = QADataset
+    elif data_args.task_name.lower() == "others":
+        assert data_args.dataset_name.lower() in OTHERS_DATASETS
+        from tasks.others.dataset import OthersDataset
+        dataset = OthersDataset
     else:
         raise NotImplementedError("Task {} is not implemented. Please choose a task from: {}".format(data_args.task_name, ", ".join(TASKS)))
     

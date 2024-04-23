@@ -51,21 +51,19 @@ class GlueDataset(AbstractDataset):
         # labels
         self.is_regression = data_args.dataset_name == "stsb"
         if not self.is_regression:
-            self.label_list = self.raw_datasets["train"].features["label"].names
-            self.num_labels = len(self.label_list)
-        else:
-            self.num_labels = 1
-        
-        # Set max_target_length by label_list
-        self.set_max_target_length(training_args.generation_max_length)
-        
-        # Preprocessing the raw_datasets
-        self.sentence1_key, self.sentence2_key = task_to_keys[data_args.dataset_name]
+            self.labels_list = self.raw_datasets["train"].features["label"].names
+            self.num_labels = len(self.labels_list)
         
         # Some models have set the order of the labels to use, so let's make sure we do use it.
         if not self.is_regression:
-            self.label2id = {l: i for i, l in enumerate(self.label_list)}
+            self.label2id = {l: i for i, l in enumerate(self.labels_list)}
             self.id2label = {id: label for label, id in self.label2id.items()}
+        
+        # Set max_target_length by labels_list
+        self.max_target_length = self.set_max_target_length(training_args.generation_max_length)
+        
+        # Preprocessing the raw_datasets
+        self.sentence1_key, self.sentence2_key = task_to_keys[data_args.dataset_name]
         
         # Check dataset
         logger.info(f"{colorstr('bright_yellow', 'bold', 'Check Dataset')}")
