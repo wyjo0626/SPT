@@ -116,9 +116,9 @@ class EPTEmbedding(BaseEmbedding):
                 
                 if dropout > 0: self.encoder.append(nn.Dropout(p=dropout))
                 if layer_norm: self.encoder.append(nn.LayerNorm(self.token_dim))
-                if num_layers > 2:
+                if num_layers > 1:
                     tmp = self.encoder
-                    for i in range(num_layers):
+                    for i in range(num_layers - 1):
                         self.encoder = self.encoder + tmp
             else:
                 raise ValueError("Prompt encoder type not recognized. Please use one of MLP (recommended) or LSTM")
