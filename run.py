@@ -104,12 +104,16 @@ if __name__ == "__main__":
         assert data_args.dataset_name.lower() in SUPERGLUE_DATASETS
         from tasks.superglue.dataset import SuperGlueDataset
         dataset = SuperGlueDataset
+    elif data_args.task_name.lower() == "qa":
+        assert data_args.dataset_name.lower() in QA_DATASETS
+        from tasks.qa.dataset import QADataset
+        dataset = QADataset
     else:
         raise NotImplementedError("Task {} is not implemented. Please choose a task from: {}".format(data_args.task_name, ", ".join(TASKS)))
     
     set_seed(training_args.seed)
     
-    trainer, predict_dataset = get_trainer(model_args, data_args, training_args, peft_args, dataset)
+    trainer, dataset = get_trainer(model_args, data_args, training_args, peft_args, dataset)
     
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -136,4 +140,4 @@ if __name__ == "__main__":
         evaluate(trainer)
     
     if training_args.do_predict:
-        predict(trainer, predict_dataset)
+        predict(trainer, dataset.predict_dataset)

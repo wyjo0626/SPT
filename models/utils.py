@@ -71,12 +71,20 @@ logger = logging.getLogger(__name__)
 def get_model(model_args, peft_args, task_type: TaskType, tokenizer, dataset):
     logger.info(f"{colorstr('bright_blue', 'bold', '*** Model Initialization Start ***')}")
     model_class = AUTO_MODEL[task_type]
-    model = model_class.from_pretrained(
-        model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        num_labels=dataset.num_labels
-    )
+    
+    if dataset.num_labels:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            num_labels=dataset.num_labels
+        )
+    else:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+        )
     
     all_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"***** {colorstr('bright_yellow', 'bold', 'orig total param')} is {colorstr('bright_yellow', 'bold', f'{all_param}')} *****")
@@ -162,4 +170,4 @@ def get_trainer(model_args, data_args, training_args, peft_args, Dataset):
             data_collator=DataCollatorForSeq2Seq(tokenizer, model=model)
         )
     
-    return trainer, dataset.predict_dataset
+    return trainer, dataset

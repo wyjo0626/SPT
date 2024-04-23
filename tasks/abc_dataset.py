@@ -61,6 +61,11 @@ class AbstractDataset(ABC):
         
         if self.task in ['glue', 'super_glue']:
             self.raw_datasets = load_dataset(self.task, self.name)
+        elif self.task == "qa":
+            if self.name in ["squad", "drop", "piqa", "commonsense_qa", "social_i_qa"]:
+                self.raw_datasets = load_dataset(self.name)
+            elif self.name in ["newsqa", "searchqa", "hotpotqa", "nq"]:
+                self.raw_datasets = load_dataset("lucadiliello/" + (self.name if self.name != "nq" else "naturalquestionsshortqa"))
         else:
             raise NotImplementedError
 
