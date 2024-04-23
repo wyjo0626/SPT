@@ -137,17 +137,18 @@ class GlueDataset(AbstractDataset):
             }
         
         num_example_per_class = self.data_args.k_shot_example // len(class_num_dct)
+        if self.data_args.k_shot_example % len(class_num_dct) > 0: num_example_per_class += 1
         shuffled_train_dataset = self.processed_dataset["train"].shuffle(seed=self.training_args.seed)
         index_lst = []
         
-        for i, data in enumerate(self.processed_dataset["train"]):
+        for i, data in enumerate(shuffled_train_dataset):
             if sum(class_num_dct.values()) == self.data_args.k_shot_example:
                 break
             
             label = data["target"]
             if self.data_args.task_name == "stsb":
                 label = "0" if float(label) <= 2.5 else "1"
-            if class_num_dct[label] < num_example_per_class or sum(class_num_dct.values()) == self.data_args.k_shot_example - 1:
+            if class_num_dct[label] < num_example_per_class and sum(class_num_dct.values()) < self.data_args.k_shot_example:
                 class_num_dct[label] += 1
                 index_lst.append(i)
         

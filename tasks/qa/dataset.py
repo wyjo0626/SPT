@@ -99,6 +99,9 @@ class QADataset(AbstractDataset):
         # Preprocess format
         self.preprocess_dataset()
         
+        if data_args.k_shot_example is not None:
+            self.preprocess_k_shot_dataset()
+        
         # Tokenize
         self.tokenize_dataset()
         
@@ -151,7 +154,33 @@ class QADataset(AbstractDataset):
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix, extra_fields)
     
     def preprocess_k_shot_dataset(self):
-        None
+        if self.name in ["piqa", "commonsense_qa", "social_i_qa"]:
+            class_num_dct = {}
+            
+            for _, value in enumerate(self.label2id.values()):
+                class_num_dct[str(value)] = 0
+        
+            num_example_per_class = self.data_args.k_shot_example // len(class_num_dct)
+            if self.data_args.k_shot_example % len(class_num_dct) > 0: num_example_per_class += 1
+        
+        shuffled_train_dataset = self.processed_dataset["train"].shuffle(seed=self.training_args.seed)
+        index_lst = []
+        
+        for i, data in enumerate(shuffled_train_dataset):
+            if self.name in ["piqa", "commonsense_qa", "social_i_qa"]:
+                if sum(class_num_dct.values()) == self.data_args.k_shot_example:
+                    break
+                
+                label = data["target"]
+                if class_num_dct[label] < num_example_per_class and sum(class_num_dct.values()) < self.data_args.k_shot_example:
+                    class_num_dct[label] += 1
+                    index_lst.append(i)
+            else:
+                if len(index_lst) == self.data_args.k_shot_example:
+                    break
+                index_lst.append(i)
+        
+        self.processed_dataset["train"] = shuffled_train_dataset.select(index_lst)
     
     def split_dataset(self):
         is_small = None
