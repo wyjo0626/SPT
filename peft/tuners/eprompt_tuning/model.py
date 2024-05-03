@@ -15,7 +15,7 @@
 import torch
 import torch.nn as nn
 
-from .config import EPromptTuningConfig, EPTReparameterizationType, EPTActivationType
+from .config import EPromptTuningConfig, EPTReparameterizationType, EPTActivationType, EPTResidualType
 from peft.tuners.tuners_utils import BaseEmbedding
 
 
@@ -72,10 +72,10 @@ class EPTEmbedding(BaseEmbedding):
         nonlinear_type = config.ept_nonlinearity
         
         hidden_size = config.ept_hidden_size
-        num_layers = config.ept_num_layers
         dropout = config.ept_dropout
         layer_norm = config.ept_layer_norm
         bias = config.ept_bias
+        self.num_layers = config.ept_num_layers
         self.residual = config.ept_residual
         
         if not config.inference_mode:
@@ -96,7 +96,7 @@ class EPTEmbedding(BaseEmbedding):
                 self.lstm_head = nn.LSTM(
                     input_size=self.token_dim,
                     hidden_size=self.token_dim // 2,
-                    num_layers=num_layers,
+                    num_layers=self.num_layers,
                     dropout=dropout,
                     bidirectional=True,
                     batch_first=True,
@@ -108,7 +108,7 @@ class EPTEmbedding(BaseEmbedding):
                 self.encoder.append(nn.Linear(hidden_size, self.token_dim, bias=bias))
             elif self.encoder_type == EPTReparameterizationType.TRANSFORMER:
                 encoder_layer = nn.TransformerEncoderLayer(d_model=self.token_dim, nhead=2, dropout=dropout, activation=nonlinear)
-                self.encoder.append(nn.TransformerEncoder(encoder_layer, num_layers=num_layers))
+                self.encoder.append(nn.TransformerEncoder(encoder_layer, num_layers=self.num_layers))
             elif self.encoder_type == EPTReparameterizationType.MLP:
                 self.encoder.append(nn.Linear(self.token_dim, hidden_size, bias=bias))
                 if nonlinear: self.encoder.append(nonlinear)
@@ -116,10 +116,6 @@ class EPTEmbedding(BaseEmbedding):
                 
                 if dropout > 0: self.encoder.append(nn.Dropout(p=dropout))
                 if layer_norm: self.encoder.append(nn.LayerNorm(self.token_dim))
-                if num_layers > 1:
-                    tmp = self.encoder
-                    for i in range(num_layers - 1):
-                        self.encoder = self.encoder + tmp
             else:
                 raise ValueError("Prompt encoder type not recognized. Please use one of MLP (recommended) or LSTM")
         
@@ -132,8 +128,15 @@ class EPTEmbedding(BaseEmbedding):
             output_embeds = self.encoder(self.lstm_head(input_embeds)[0])
         else:
             output_embeds = self.encoder(input_embeds)
+            identity = output_embeds
+            
+            for i in range(self.num_layers - 1):
+                output_embeds = self.encoder(input_embeds)
+                if self.residual == EPTResidualType.EXP:
+                    output_embeds = output_embeds + identity
+                identity = output_embeds
         
-        if self.residual:
+        if self.residual == EPTResidualType.INPUT:
             return output_embeds + input_embeds
         else:
             return output_embeds

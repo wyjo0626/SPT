@@ -64,6 +64,7 @@ from .tuners import (
     EPromptTuningConfig,
     EPTActivationType,
     EPTReparameterizationType,
+    EPTResidualType,
     EPTEmbedding
 )
 from .utils import (

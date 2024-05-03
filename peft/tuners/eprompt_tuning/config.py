@@ -33,6 +33,12 @@ class EPTActivationType(str, enum.Enum):
     SIGM = "SIGM"
 
 
+class EPTResidualType(str, enum.Enum):
+    NONE = "NONE"
+    INPUT = "INPUT"
+    EXP = "EXP"
+
+
 @dataclass
 class EPromptTuningConfig(PromptLearningConfig):
     """
@@ -55,6 +61,10 @@ class EPromptTuningConfig(PromptLearningConfig):
         default=EPTActivationType.NONE,
         metadata={"help": "the type of activation function."}
     )
+    ept_residual: Union[EPTResidualType, str] = field(
+        default=EPTResidualType.NONE,
+        metadata={"help": "the type of residual connection."}
+    )
     ept_hidden_size: int = field(
         default=1,
         metadata={"help": "The hidden size of ept encoder"},
@@ -74,10 +84,6 @@ class EPromptTuningConfig(PromptLearningConfig):
     ept_layer_norm: bool = field(
         default=False,
         metadata={"help": "Set this the True if you use layer normalization"}
-    )
-    ept_residual: bool = field(
-        default=False,
-        metadata={"help": "Set this the True if you use residual connection."}
     )
     
     def __post_init__(self):

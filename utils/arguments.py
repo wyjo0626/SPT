@@ -17,6 +17,7 @@ from peft import (
     ResidualPromptTuningReparameterizationType,
     EPTReparameterizationType,
     EPTActivationType,
+    EPTResidualType,
 )
 
 from tasks.utils import *
@@ -475,9 +476,9 @@ class DynamicPeftArguments:
         default=False,
         metadata={"help": "Set this the True if you use layer normalization"}
     )
-    ept_residual: bool = field(
-        default=False,
-        metadata={"help": "Set this the True if you use residual connection."}
+    ept_residual: Union[EPTResidualType, str] = field(
+        default=EPTResidualType.NONE,
+        metadata={"help": "the type of residual connection."}
     )
 
 
