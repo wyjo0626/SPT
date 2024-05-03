@@ -131,7 +131,7 @@ class EPTEmbedding(BaseEmbedding):
             identity = output_embeds
             
             for i in range(self.num_layers - 1):
-                output_embeds = self.encoder(input_embeds)
+                output_embeds = self.encoder(output_embeds)
                 if self.residual == EPTResidualType.EXP:
                     output_embeds = output_embeds + identity
                 identity = output_embeds
