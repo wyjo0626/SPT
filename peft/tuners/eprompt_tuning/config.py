@@ -31,6 +31,7 @@ class EPTActivationType(str, enum.Enum):
     RELU = "RELU"
     TANH = "TANH"
     SIGM = "SIGM"
+    SCLU = "SCLU"
 
 
 class EPTResidualType(str, enum.Enum):
@@ -84,6 +85,18 @@ class EPromptTuningConfig(PromptLearningConfig):
     ept_layer_norm: bool = field(
         default=False,
         metadata={"help": "Set this the True if you use layer normalization"}
+    )
+    ept_s_cycle: int = field(
+        default=1,
+        metadata={"help": "The number of sin cycle"}
+    )
+    ept_c_cycle: int = field(
+        default=1,
+        metadata={"help": "The number of cos cycle"}
+    )
+    ept_a_scale: int = field(
+        default=1,
+        metadata={"help": "The number of SCLU scale"}
     )
     
     def __post_init__(self):

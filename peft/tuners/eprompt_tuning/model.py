@@ -19,6 +19,20 @@ from .config import EPromptTuningConfig, EPTReparameterizationType, EPTActivatio
 from peft.tuners.tuners_utils import BaseEmbedding
 
 
+class SCLU(nn.Module):
+    """
+    The activation function that is Sin Cos Linear Unit
+    """
+    def __init__(self, s_cycle=1, c_cycle=1, a_scale=1):
+        super().__init__()
+        self.s = s_cycle
+        self.c = c_cycle
+        self.a = a_scale
+    
+    def forward(self, x):
+        return torch.sin(x * self.s) * torch.cos(x * self.c) / self.a + x
+
+
 class EPTEmbedding(BaseEmbedding):
     """
     The prompt encoder network that is used to generate the virtual token embeddings for ept.
@@ -86,6 +100,8 @@ class EPTEmbedding(BaseEmbedding):
                 nonlinear = nn.Tanh()
             elif nonlinear_type == EPTActivationType.SIGM:
                 nonlinear = nn.Sigmoid()
+            elif nonlinear_type == EPTActivationType.SCLU:
+                nonlinear = SCLU(config.ept_s_cycle, config.ept_c_cycle, config.ept_a_scale)
             else:
                 nonlinear = None
             

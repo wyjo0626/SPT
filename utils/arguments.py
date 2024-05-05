@@ -480,6 +480,18 @@ class DynamicPeftArguments:
         default=EPTResidualType.NONE,
         metadata={"help": "the type of residual connection."}
     )
+    ept_s_cycle: int = field(
+        default=1,
+        metadata={"help": "The number of sin cycle"}
+    )
+    ept_c_cycle: int = field(
+        default=1,
+        metadata={"help": "The number of cos cycle"}
+    )
+    ept_a_scale: int = field(
+        default=1,
+        metadata={"help": "The number of SCLU scale"}
+    )
 
 
 def get_args():
