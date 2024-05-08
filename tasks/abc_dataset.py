@@ -140,10 +140,12 @@ class AbstractDataset(ABC):
         else:
             return indices[validation_size:]
     
-    def get(self, split_key, split, n_obs=None, split_validation_test=False, is_small=None):
+    def get(self, split_key, split, n_obs=None, split_validation_test=False, is_small=None, is_few=None):
+        if is_few and is_small == False:
+            dataset = self.tokenized_dataset[split_key[split]]
         # For small datasets (n_samples < 10K) without test set, we divide validation set to
         # half, use one half as test set and one half as validation set.
-        if split_validation_test and is_small == True and split != "train":
+        elif split_validation_test and is_small == True and split != "train":
             dataset = self.tokenized_dataset[split_key["validation"]]
             indices = self.get_split_indices(split, dataset, validation_size=len(dataset) // 2)
             dataset = self.subsample(dataset, n_obs, indices)

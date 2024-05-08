@@ -145,6 +145,24 @@ class OthersDataset(AbstractDataset):
                 class_num_dct[label] += 1
                 index_lst.append(i)
         
+        if self.name in large_datasets_without_all_splits:
+            if self.name in ["scitail", "paws"]:
+                split_key = {"train": "train", "validation": "validation", "test": "test"}
+            elif self.name in ["yelp", "amazon"]:
+                split_key = {"train": "train", "validation": "test"}
+            else:
+                split_key = {"train": "train", "validation": "validation"}
+            
+            self.processed_dataset[split_key["test"]] = self.processed_dataset[split_key["validation"]]
+            
+            if len(self.processed_dataset[split_key["train"]]) > 100000:
+                validation_size = 10000
+            else:
+                validation_size = 1000
+            indices = self.shuffled_indices(self.processed_dataset[split_key["train"]])[:validation_size]
+            valid_dataset = self.subsample(self.processed_dataset[split_key["train"]], None, indices)
+            self.processed_dataset[split_key["validation"]] = valid_dataset
+        
         self.processed_dataset["train"] = shuffled_train_dataset.select(index_lst)
 
     def split_dataset(self):
@@ -167,7 +185,8 @@ class OthersDataset(AbstractDataset):
                                           split="train", 
                                           n_obs=self.data_args.max_train_samples,
                                           split_validation_test=self.data_args.split_validation_test,
-                                          is_small=is_small)
+                                          is_small=is_small,
+                                          is_few=self.data_args.k_shot_example)
         
         # Evaluation
         if self.training_args.do_eval:
@@ -175,14 +194,16 @@ class OthersDataset(AbstractDataset):
                                          split="validation",
                                          n_obs=self.data_args.max_eval_samples,
                                          split_validation_test=self.data_args.split_validation_test,
-                                         is_small=is_small)
+                                         is_small=is_small,
+                                         is_few=self.data_args.k_shot_example)
         
         if self.training_args.do_predict:
             self.predict_dataset = self.get(split_key=dct,
                                             split="test",
                                             n_obs=self.data_args.max_predict_samples,
                                             split_validation_test=self.data_args.split_validation_test,
-                                            is_small=is_small)
+                                            is_small=is_small,
+                                            is_few=self.data_args.k_shot_example)
 
     def set_metrics(self):
         self.metrics_name = task_to_metrics[self.name]["name"]
