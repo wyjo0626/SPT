@@ -144,7 +144,7 @@ class GlueDataset(AbstractDataset):
                 break
             
             label = data["target"]
-            if self.data_args.task_name == "stsb":
+            if self.data_args.dataset_name == "stsb":
                 label = "0" if float(label) <= 2.5 else "1"
             if class_num_dct[label] < num_example_per_class and sum(class_num_dct.values()) < self.data_args.k_shot_example:
                 class_num_dct[label] += 1
