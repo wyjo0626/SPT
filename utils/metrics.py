@@ -153,18 +153,18 @@ def mean_multiclass_f1(num_classes, **metric_fn_kwargs):
         **metric_fn_kwargs)
 
 
-def squad(predictions, targets):
+def squad(predictions, labels):
     """Computes SQuAD metrics, maximizing over answers per question.
     Args:
-      targets: list of lists of strings
+      labels: list of lists of strings
       predictions: list of strings
     Returns:
-      dict with score_key: squad score across all targets and predictions
+      dict with score_key: squad score across all labels and predictions
     """
-    if type(targets[0]) is list:
-        targets = [[normalize_squad(t) for t in u] for u in targets]
+    if type(labels[0]) is list:
+        labels = [[normalize_squad(t) for t in u] for u in labels]
     else:
-        targets = [normalize_squad(t) for u in targets]
+        labels = [normalize_squad(t) for t in labels]
     
     predictions = [normalize_squad(p) for p in predictions]
-    return qa_metrics(targets, predictions)
+    return qa_metrics(labels, predictions)

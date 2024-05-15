@@ -19,7 +19,7 @@ def pad_punctuation(text):
 
 def _normalize_answer(text, punc_chars, punc_repl):
     """Lower text and remove punctuation, articles and extra whitespace."""
-    def remove_artices(s):
+    def remove_articles(s):
         return re.sub(r"\b(a|an|the)\b", " ", s)
     
     def replace_punctuation(s):

@@ -204,6 +204,9 @@ class OthersDataset(AbstractDataset):
                                             split_validation_test=self.data_args.split_validation_test,
                                             is_small=is_small,
                                             is_few=self.data_args.k_shot_example)
+        
+        if self.training_args.do_train and self.name == "yelp" and not self.data_args.k_shot_example:
+            self.train_dataset = self.train_dataset.select(list(range(100000)))
 
     def set_metrics(self):
         self.metrics_name = task_to_metrics[self.name]["name"]
