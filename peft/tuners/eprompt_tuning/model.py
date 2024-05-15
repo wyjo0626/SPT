@@ -96,9 +96,6 @@ class EPTEmbedding(BaseEmbedding):
         self.num_virtual_tokens = config.num_virtual_tokens
         self.concat = config.ept_concat
         
-        if self.concat:
-            config.num_original_tokens = self.num_virtual_tokens
-        
         if not config.inference_mode:
             
             if nonlinear_type == EPTActivationType.RELU:
