@@ -86,6 +86,10 @@ class EPromptTuningConfig(PromptLearningConfig):
         default=False,
         metadata={"help": "Set this the True if you use layer normalization"}
     )
+    ept_concat: int = field(
+        default=None,
+        metadata={"help": "Set this the int if you want to tuning in concatenated prompt"}
+    )
     ept_s_cycle: int = field(
         default=1,
         metadata={"help": "The number of sin cycle"}

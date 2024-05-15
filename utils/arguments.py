@@ -480,6 +480,10 @@ class DynamicPeftArguments:
         default=EPTResidualType.NONE,
         metadata={"help": "the type of residual connection."}
     )
+    ept_concat: int = field(
+        default=None,
+        metadata={"help": "Set this the int if you want to tuning in concatenated prompt"}
+    )
     ept_s_cycle: int = field(
         default=1,
         metadata={"help": "The number of sin cycle"}

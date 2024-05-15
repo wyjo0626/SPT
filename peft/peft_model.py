@@ -436,6 +436,9 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         self.prompt_tokens[adapter_name] = torch.arange(
             config.num_virtual_tokens * config.num_transformer_submodules
         ).long()
+        
+        if config.peft_type == PeftType.EPROMPT_TUNING and config.ept_concat:
+            config.num_virtual_tokens = config.ept_concat
 
     def _prepare_model_for_gradient_checkpointing(self, model: PreTrainedModel):
         r"""
@@ -755,7 +758,9 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         ] and not hasattr(self.prompt_encoder[adapter_name], "reduced_embedding"):
             self.prompt_encoder[adapter_name].create_reduced_embedding()
             self.prompt_encoder[adapter_name].reduced_embedding.to(self.device)
-        
+        if self.peft_config[adapter_name].peft_type == PeftType.EPROMPT_TUNING and self.peft_config[adapter_name].ept_concat:
+            self.prompt_encoder[adapter_name].init_concatenated_embedding()
+            self.prompt_encoder[adapter_name].embedding.to(self.device)
         if self.peft_config[adapter_name].peft_type in [
             PeftType.XPROMPT_TUNING,
             PeftType.RPROMPT_TUNING

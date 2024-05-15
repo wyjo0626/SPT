@@ -92,6 +92,13 @@ class EPTEmbedding(BaseEmbedding):
         self.num_layers = config.ept_num_layers
         self.residual = config.ept_residual
         
+        self.num_modules = config.num_transformer_submodules
+        self.num_virtual_tokens = config.num_virtual_tokens
+        self.concat = config.ept_concat
+        
+        if self.concat:
+            config.num_original_tokens = self.num_virtual_tokens
+        
         if not config.inference_mode:
             
             if nonlinear_type == EPTActivationType.RELU:
@@ -137,6 +144,9 @@ class EPTEmbedding(BaseEmbedding):
         
         self.encoder = nn.Sequential(*self.encoder)
 
+    def init_concatenated_embedding(self):
+        self.embedding = nn.Embedding(self.concat * self.num_modules, self.token_dim)
+
     def forward(self, indices):
         input_embeds = self.embedding(indices)
         
@@ -144,15 +154,25 @@ class EPTEmbedding(BaseEmbedding):
             output_embeds = self.encoder(self.lstm_head(input_embeds)[0])
         else:
             output_embeds = self.encoder(input_embeds)
-            identity = output_embeds
+            if self.residual == EPTResidualType.EXP:
+                output_embeds = output_embeds + input_embeds
+                identity = output_embeds
             
             for i in range(self.num_layers - 1):
                 output_embeds = self.encoder(output_embeds)
                 if self.residual == EPTResidualType.EXP:
                     output_embeds = output_embeds + identity
-                identity = output_embeds
+                    identity = output_embeds
         
         if self.residual == EPTResidualType.INPUT:
-            return output_embeds + input_embeds
-        else:
-            return output_embeds
+            output_embeds = output_embeds + input_embeds
+        
+        if self.concat:
+            batch_size, _, _ = input_embeds.shape
+            concat_embeds = output_embeds[0, self.num_virtual_tokens:].repeat(self.concat, 1)
+            if self.num_modules == 2:
+                decoder_embeds = output_embeds[0, :self.num_virtual_tokens].repeat(self.concat, 1)
+                concat_embeds = torch.concat((concat_embeds, decoder_embeds))
+            output_embeds = concat_embeds.unsqueeze(0).expand(batch_size, -1, -1)
+        
+        return output_embeds
