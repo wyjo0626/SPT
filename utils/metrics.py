@@ -88,24 +88,6 @@ def matthews_corrcoef(predictions, labels) -> dict:
     return {"matthews_correlation": 100 * sklearn.metrics.matthews_corrcoef(labels, predictions)}
 
 
-def squad(predictions, labels):
-    """Computes SQuAD metrics, maximizing over answers per question.
-    Args:
-      labels: list of lists of strings
-      predictions: list of strings
-    Returns:
-      dict with score_key: squad score across all labels and predictions
-    """
-
-    if type(labels[0]) is list:
-        labels = [[normalize_squad(t) for t in u] for u in labels]
-    else:
-        labels = [[normalize_squad(u)] for u in labels]
-
-    predictions = [normalize_squad(p) for p in predictions]
-    return qa_metrics(labels, predictions)
-
-
 def exact_match(predictions, labels):
     """Computes whether the labels match predictions exactly."""
     return {"em": 100 * float(np.array_equal(labels, predictions))}

@@ -49,9 +49,12 @@ def normalize_squad(answer):
 
 def _metric_max_over_ground_truths(metric_fn, ground_truths, prediction):
     """Computes the maximum of the metric over all ground truths."""
-    return max(
-        metric_fn(ground_truth, prediction) for ground_truth in ground_truths
-    )
+    if type(ground_truths) == list:
+        return max(
+            metric_fn(ground_truth, prediction) for ground_truth in ground_truths
+        )
+    else:
+        return metric_fn(ground_truths, prediction)
 
 
 def _exact_match_score(label, prediction):
