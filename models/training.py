@@ -3,6 +3,7 @@ from copy import deepcopy
 import os
 import logging
 import torch
+import numpy as np
 
 from transformers import (
     Trainer,
@@ -28,10 +29,14 @@ from transformers.utils import (
     is_accelerate_available,
     is_safetensors_available,
 )
+from transformers.models.auto.modeling_auto import (
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_MAPPING_NAMES,
+)
 from transformers.configuration_utils import PretrainedConfig
 from transformers.integrations import deepspeed_load_checkpoint
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS, is_torch_greater_or_equal_than_1_13
-from peft import PeftModel, XPromptTuningConfig, RPromptTuningConfig
+from peft import PeftModel, XPromptTuningConfig, RPromptTuningConfig, PromptLearningConfig
 from utils.general import colorstr, colorformat, emojis
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,12 @@ if is_accelerate_available():
 
 if is_safetensors_available():
     import safetensors.torch
+
+
+def sim(matrix1, matrix2):
+    cosine_similarity = np.dot(matrix1, matrix2) / (np.linalg.norm(matrix1) * np.linalg.norm(matrix2))
+    return cosine_similarity
+
 
 class BaseTrainer(Trainer):
     def __init__(self, *args, **kwargs):
@@ -339,6 +350,7 @@ class BaseSeq2SeqTrainer(Seq2SeqTrainer):
             if isinstance(callback, ProgressCallback):
                 self.remove_callback(callback)
         self.add_callback(TrainProgressCallback(self))
+        self.cosine_similarity = None
     
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         # If we are executing this function, we are the process zero, so we don't check for that.
@@ -590,6 +602,56 @@ class BaseSeq2SeqTrainer(Seq2SeqTrainer):
             if not is_sagemaker_mp_enabled():
                 self._issue_warnings_after_load(load_result)
 
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        if self.args.cosine_similarity:
+            inputs["output_hidden_states"] = True
+
+        outputs = model(**inputs)
+        
+        if self.args.cosine_similarity and isinstance(model, PeftModel) and isinstance(model.active_peft_config, PromptLearningConfig):
+            sim_ = []
+            for i in range(model.active_peft_config.num_virtual_tokens):
+                sim_.append(
+                    sim(
+                    outputs["encoder_hidden_states"][0][0][i].detach().cpu(),
+                    outputs["encoder_hidden_states"][12][0][i].detach().cpu(),
+                    )
+                )
+            self.cosine_similarity = float(np.mean(sim_))
+        
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        if labels is not None:
+            unwrapped_model = self.accelerator.unwrap_model(model)
+            if isinstance(unwrapped_model, PeftModel):
+                model_name = unwrapped_model.base_model.model._get_name()
+            else:
+                model_name = unwrapped_model._get_name()
+            if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
+        else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        
+        return (loss, outputs) if return_outputs else loss
+
 
 class TrainCallback(TrainerCallback):
     def  __init__(self, trainer) -> None:
@@ -617,6 +679,9 @@ class TrainCallback(TrainerCallback):
             self.prune.estimate_piece_importance(self._trainer, state.global_step)
     
     def on_step_end(self, args, state, control, **kwargs):
+        if self._trainer.args.cosine_similarity and self._trainer.cosine_similarity is not None:
+            self._trainer.log({"cosine_similarity": self._trainer.cosine_similarity})
+        
         if control.should_evaluate and self._trainer.args.eval_training:
             control_copy = deepcopy(control)
             self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix="train")

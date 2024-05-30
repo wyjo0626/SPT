@@ -205,6 +205,10 @@ class DynamicTrainingArguments(Seq2SeqTrainingArguments):
         default=1, 
         metadata={"help": "Number of beams to use for evaluation."}
     )
+    cosine_similarity: bool = field(
+        default=False,
+        metadata={"help": "Whether to measure the cosine similarity between input soft prompts and output (from encoder) soft prompts"}
+    )
 
 
 @dataclass
