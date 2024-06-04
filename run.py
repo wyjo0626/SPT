@@ -13,7 +13,7 @@ from utils.arguments import get_args
 from utils.general import colorstr, colorformat, emojis
 from tasks.utils import *
 
-os.environ["WANDB_PROJECT"] = "huggingface"
+os.environ["WANDB_PROJECT"] = "peft"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
@@ -75,12 +75,12 @@ if __name__ == "__main__":
         datefmt="%m/%d/%Y %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    logging.getLogger().setLevel(logging.ERROR)
+
     log_level = training_args.get_process_log_level()
-    logger.setLevel(log_level)
+    # logger.setLevel(log_level)
     datasets.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.set_verbosity_error()
-    transformers.utils.logging.set_verbosity(log_level)
+    # transformers.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
     
