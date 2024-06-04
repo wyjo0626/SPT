@@ -351,6 +351,7 @@ class BaseSeq2SeqTrainer(Seq2SeqTrainer):
                 self.remove_callback(callback)
         self.add_callback(TrainProgressCallback(self))
         self.cosine_similarity = None
+        self.norm = None
     
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         # If we are executing this function, we are the process zero, so we don't check for that.
@@ -627,6 +628,14 @@ class BaseSeq2SeqTrainer(Seq2SeqTrainer):
                     )
                 )
             self.cosine_similarity = float(np.mean(sim_))
+        if self.args.norm and isinstance(model, PeftModel) and isinstance(model.active_peft_config, PromptLearningConfig):
+            norm_ = []
+            soft_prompt = model.get_prompt(1)[0][:model.active_peft_config.num_virtual_tokens]
+            for i in range(model.active_peft_config.num_virtual_tokens):
+                norm_.append(
+                    np.linalg.norm(soft_prompt[i].detach().cpu(), 2)
+                )
+            self.norm = float(np.mean(norm_))
         
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
@@ -681,6 +690,8 @@ class TrainCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         if self._trainer.args.cosine_similarity and self._trainer.cosine_similarity is not None:
             self._trainer.log({"cosine_similarity": self._trainer.cosine_similarity})
+        if self._trainer.args.norm and self._trainer.norm is not None:
+            self._trainer.log({"norm": self._trainer.norm})
         
         if control.should_evaluate and self._trainer.args.eval_training:
             control_copy = deepcopy(control)
