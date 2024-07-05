@@ -209,6 +209,10 @@ class DynamicTrainingArguments(Seq2SeqTrainingArguments):
         default=False,
         metadata={"help": "Whether to measure the cosine similarity between input soft prompts and output (from encoder) soft prompts"}
     )
+    norm: bool = field(
+        default=False,
+        metadata={"help": "Whether to measure the norm the soft prompts"}
+    )
 
 
 @dataclass

@@ -90,6 +90,8 @@ class BaseTrainer(Trainer):
             if isinstance(callback, ProgressCallback):
                 self.remove_callback(callback)
         self.add_callback(TrainProgressCallback(self))
+        self.cosine_similarity = None
+        self.norm = None
     
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         # If we are executing this function, we are the process zero, so we don't check for that.
@@ -340,6 +342,64 @@ class BaseTrainer(Trainer):
             )
             if not is_sagemaker_mp_enabled():
                 self._issue_warnings_after_load(load_result)
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        if self.args.cosine_similarity:
+            inputs["output_hidden_states"] = True
+
+        outputs = model(**inputs)
+        
+        if self.args.cosine_similarity and isinstance(model, PeftModel) and isinstance(model.active_peft_config, PromptLearningConfig):
+            sim_ = []
+            for i in range(model.active_peft_config.num_virtual_tokens):
+                sim_.append(
+                    sim(
+                    outputs["encoder_hidden_states"][0][0][i].detach().cpu(),
+                    outputs["encoder_hidden_states"][12][0][i].detach().cpu(),
+                    )
+                )
+            self.cosine_similarity = float(np.mean(sim_))
+        if self.args.norm and isinstance(model, PeftModel) and isinstance(model.active_peft_config, PromptLearningConfig):
+            norm_ = []
+            soft_prompt = model.get_prompt(1)[0][:model.active_peft_config.num_virtual_tokens]
+            for i in range(model.active_peft_config.num_virtual_tokens):
+                norm_.append(
+                    np.linalg.norm(soft_prompt[i].detach().cpu(), 2)
+                )
+            self.norm = float(np.mean(norm_))
+        
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        if labels is not None:
+            unwrapped_model = self.accelerator.unwrap_model(model)
+            if isinstance(unwrapped_model, PeftModel):
+                model_name = unwrapped_model.base_model.model._get_name()
+            else:
+                model_name = unwrapped_model._get_name()
+            if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
+        else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        
+        return (loss, outputs) if return_outputs else loss
 
 
 class BaseSeq2SeqTrainer(Seq2SeqTrainer):
