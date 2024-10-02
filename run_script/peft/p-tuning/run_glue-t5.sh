@@ -41,7 +41,8 @@ for MODEL_NAME in $MODELS_NAME; do
         --save_total_limit 1 \
         --peft_type $PEFT_TYPE \
         --init_type $init_type \
-        --num_virtual_tokens $virtual_token;
+        --num_virtual_tokens $virtual_token \
+        --encoder_hidden_size 128;
     done;
   done;
 done;
