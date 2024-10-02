@@ -358,10 +358,12 @@ class PostProcessor(ABC):
         if isinstance(preds, tuple):
             preds = preds[0]
         
-        decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
         if self.ignore_pad_token_for_loss:
             # Replace -100 in the labels as we can't decode them.
             labels = np.where(labels != -100, labels, self.tokenizer.pad_token_id)
+            preds = np.where(preds != -100, preds, self.tokenizer.pad_token_id)
+        
+        decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
         decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
         # Some simple post-processing
         decoded_preds = [pred.strip() for pred in decoded_preds]

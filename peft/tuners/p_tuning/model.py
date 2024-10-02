@@ -108,8 +108,6 @@ class PromptEncoder(BaseEmbedding):
                     torch.nn.Linear(self.input_size, self.hidden_size),
                     torch.nn.ReLU(),
                     torch.nn.Linear(self.hidden_size, self.hidden_size),
-                    torch.nn.ReLU(),
-                    torch.nn.Linear(self.hidden_size, self.output_size),
                 ]
                 self.mlp_head = torch.nn.Sequential(*layers)
             
