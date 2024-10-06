@@ -12,7 +12,7 @@ from transformers import (
     EvalPrediction
 )
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 
 from utils.general import colorstr, colorformat, emojis
 
@@ -205,7 +205,7 @@ class AbstractDataset(ABC):
             logger.info(f"Loading seq2seq model from {self.model_args.model_name_or_path}")
             tokenize_function = self.seq2seq_preprocess_function
             self.compute_metrics = self.compute_metrics_seq2seq
-        elif any(x in self.model_args.model_name_or_path for x in ["gpt", "llama"]):
+        elif any(x in self.model_args.model_name_or_path for x in ["gpt", "llama", "bloom"]):
             logger.info(f"Loading decoder model from {self.model_args.model_name_or_path}")
             tokenize_function = self.decoder_preprocess_function
             self.compute_metrics = self.compute_metrics_decoder
@@ -216,12 +216,14 @@ class AbstractDataset(ABC):
         self.training_args.metric_for_best_model = self.metrics_name[0]
         self.training_args.greater_is_better = True
         
-        self.tokenized_dataset = self.processed_dataset.map(
-            functools.partial(tokenize_function),
-            batched=True,
-            num_proc=self.data_args.preprocessing_num_workers,
-            remove_columns=self.column_names,
-        )
+        self.tokenized_dataset = DatasetDict({})
+        for k in self.processed_dataset.keys():
+            self.tokenized_dataset[k] = self.processed_dataset[k].map(
+                functools.partial(tokenize_function, split=k),
+                batched=True,
+                num_proc=self.data_args.preprocessing_num_workers,
+                remove_columns=self.column_names,
+            )
     
     @abstractmethod
     def preprocess_k_shot_dataset(self):
@@ -246,7 +248,7 @@ class AbstractDataset(ABC):
         ...
     
     # Preprocessing tokenize datasets
-    def encoder_preprocess_function(self, examples):
+    def encoder_preprocess_function(self, examples, split):
         model_inputs = self.tokenizer(examples['source'],
                                       max_length=self.max_seq_length,
                                       padding=self.padding,
@@ -259,7 +261,7 @@ class AbstractDataset(ABC):
         model_inputs['labels'] = labels
         return model_inputs
     
-    def seq2seq_preprocess_function(self, examples):
+    def seq2seq_preprocess_function(self, examples, split):
         model_inputs = self.tokenizer(examples['source'],
                                       max_length=self.max_seq_length,
                                       padding=self.padding,
@@ -279,7 +281,7 @@ class AbstractDataset(ABC):
         model_inputs['labels'] = labels['input_ids']
         return model_inputs
     
-    def decoder_preprocess_function(self, examples):
+    def decoder_preprocess_function(self, examples, split):
         batch_size = len(examples['source'])
         inputs = [f"{x} Label : " for x in examples['source']]
         model_inputs = self.tokenizer(inputs)
@@ -287,8 +289,11 @@ class AbstractDataset(ABC):
         
         for i in range(batch_size):
             sample_input_ids = model_inputs["input_ids"][i]
-            label_input_ids = labels["input_ids"][i] + [self.tokenizer.pad_token_id]
-            model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+            label_input_ids = labels["input_ids"][i] + [self.tokenizer.eos_token_id]
+            if "train" in split:
+                model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+            else:
+                model_inputs["input_ids"][i] = sample_input_ids
             labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
             model_inputs["attention_mask"][i] = [1] * len(model_inputs["input_ids"][i])
 
@@ -301,13 +306,16 @@ class AbstractDataset(ABC):
             model_inputs["attention_mask"][i] = [0] * (self.data_args.max_seq_length - len(sample_input_ids)) + model_inputs[
                 "attention_mask"
             ][i]
-            if (self.task == "glue" or self.task == "super_glue") and self.data_args.max_seq_length - len(sample_input_ids) < 0:
-                # Some data have a sequence longer than data_args.max_seq_length, 
-                # the label might not be processed correctly, 
-                # such as max_seq_length=3, label["input_ids"] = [-100, -100, -100, -100, 101, 1015, 102, 0]
-                labels["input_ids"][i] = label_input_ids[len(sample_input_ids) - self.data_args.max_seq_length:]
+            if "train" in split:
+                if (self.task == "glue" or self.task == "super_glue") and self.data_args.max_seq_length - len(sample_input_ids) < 0:
+                    # Some data have a sequence longer than data_args.max_seq_length, 
+                    # the label might not be processed correctly, 
+                    # such as max_seq_length=3, label["input_ids"] = [-100, -100, -100, -100, 101, 1015, 102, 0]
+                    labels["input_ids"][i] = label_input_ids[len(sample_input_ids) - self.data_args.max_seq_length:]
+                else:
+                    labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(sample_input_ids)) + label_input_ids
             else:
-                labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(sample_input_ids)) + label_input_ids
+                labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(label_input_ids)) + label_input_ids
             model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][:self.data_args.max_seq_length])
             model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][:self.data_args.max_seq_length])
             labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][:self.data_args.max_seq_length])
