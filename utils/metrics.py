@@ -52,9 +52,16 @@ def preprocess_invalid(predictions, labels, num_classes: int):
     def binary_reverse(labels):
         return ['0' if label == '1' else '1' for label in labels]
     
+    def safe_convert(value):
+        try:
+            return int(value)
+        except ValueError:
+            return -1
+    
     labels, predictions = np.asarray(labels), np.asarray(predictions)
     # Get indices of invalid predictions
     if "int" in str(predictions.dtype):
+        labels = np.array([safe_convert(x) for x in labels], dtype=np.int32)
         labels = labels.astype(np.int32)
         predictions = predictions.astype(np.int32)
         
