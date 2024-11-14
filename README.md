@@ -1,80 +1,83 @@
-# peft
-LLM with peft methods
+<!-- omit in toc -->
+# Scaled Prompt Tuning
 
-# Add Peft Method
+This repository contains **S**caled **P**rompt **T**uning (SPT).
 
-To implement a new PEFT method, you need to add the following next files and codes
+![Figure 1](img/SPT_overview.png)
 
-**In Huggingface PEFT Code**
+**Table of contents**
 
-- tuners
-  - method
-    - config.py
-    - model.py
-    - __init__.py
-  - __init__.py
-- utils
-  - peft_types.py
-- mapping.py
-  - PEFT_TYPE_TO_CONFIG_MAPPING
-- peft_model.py
-  - PEFT_TYPE_TO_MODEL_MAPPING
-  - class PeftModel
-    - from_pretrained
-    - _setup_prompt_encoder, <span style="color: red;">if you need.</span>
-    - get_prompt_embedding_to_save, <span style="color: red;">if you need.</span>
-    - get_prompt, <span style="color: red;">if you need.</span>
-  - class PeftModelForSequenceClassification
-    - forward, <span style="color: red;">if you need.</span>
-  - class PeftModelForCausalLM
-    - forward, <span style="color: red;">if you need.</span>
-    - generate, <span style="color: red;">if you need.</span>
-    - prepare_inputs_for_generation, <span style="color: red;">if you need.</span>
-  - class PeftModelForSeq2SeqLM
-    - forward, <span style="color: red;">if you need.</span>
-    - generate, <span style="color: red;">if you need.</span>
-    - prepare_inputs_for_generation, <span style="color: red;">if you need.</span>
-  - class PeftModelForTokenClassification
-    - forward, <span style="color: red;">if you need.</span>
-  - class PeftModelForQuestionAnswering
-    - forward, <span style="color: red;">if you need.</span>
-  - class PeftModelForFeatureExtraction
-    - forward, <span style="color: red;">if you need.</span>
-- __init__.py
+- [Setup](#setup)
+  - [Installation](#installation)
+  - [Data](#data)
+    - [Baselines](#baselines)
+  - [Training](#training)
+    - [Few-shot Learning](#few-shot-learning)
 
-**In Custom Code**
+## SPT
 
-- model
-  - utils.py
-    - config, AUTO_PEFT
-- utils
-  - arguments.py
+We introduce **S**caled **P**rompt **T**uning - **scaling** a soft prompt using a very shallow network without activation and normalization layers and **broadcasting** the soft prompt.
 
-# TODO
+# Setup
 
-- [x] Add Residual Prompt Tuning (ref. https://github.com/arazd/ResidualPrompts)
-  - Following the code in the paper and Due to their Separate MLP methods, the virtual token is fed to Encoder before expanding it to the batch size (i.e. methods: get_prompt and forward).
-- [x] Add BitFit (ref. https://github.com/benzakenelad/BitFit)
-  - Some Models do not have bias-terms (e.g. T5). Maybe support customized layer
-  - We have to check that the there are a bias-terms in each layer
-  - If there are not the bias-terms in each layer, We insert the trainable nn.Parameter as bias to each layer
+## Installation
 
-```python
-# Mostly, torch.empty or torch.zeros are used to initialize bias-terms.
-# We follow the bias initialization from Huggingface, utilizing torch.zeros
-for name, param in module.named_modules():
-  if param.bias is None:
-    bias = nn.Parameter(torch.zeros(param.out_features), requires_grad=True)
-    param.register_parameter('bias', bias)
-  else:
-    param.bias.requires_grad = True
+Clone this repository as follows:
+
+```bash
+git clone https://github.com/whdnjsdyd111/spt
+cd spt
 ```
 
-- [ ] UniPELT
-- [ ] XPrompt
-  - In the XPrompt paper, they implemented importance score following (ref. https://github.com/pmichel31415/fairseq)
-  - So, We have to check how they implemented the importance score
+We conduct our experiment with Anaconda3.
 
-```python
-
+```bash
+conda create -n spt python=3.8
+conda activate spt
 ```
+
+Secondly, Install pytorch.
+
+```bash
+pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
+```
+
+Finally, install our package environment.
+
+```bash
+pip install -r requirements.txt
+```
+
+SPT is implemented based on Huggingface PEFT (https://github.com/huggingface/peft)
+
+## Data
+
+We download and preprocess SuperGLUE, GLUE, MRQA, and "Other" datasets from the Huggingface Datasets APIs in our codes.
+
+### Baselines
+
+- the scripts for fully fine-tuning is located in `run_script/full-fine-tuning/*`
+- the scripts for each prompt-based method are located in `run_script/peft/*`
+
+## Training
+
+You can easily train all tasks and methods by running the script.
+
+The scripts for each method consists of a directory as follows
+
+- **SuperGLUE**: `run_superglue-t5.sh`  
+- **GLUE**: `run_glue-t5.sh`  
+- **MRQA**: `run_qa-t5.sh`  
+- **Others**: `run_others-t5.sh`  
+
+### Few-shot Learning
+
+Set the `k_shot_example` parameter to specify the number of examples to be used for k-shot learning.
+
+```bash
+python run.py \
+  ...
+  --num_virtual_tokens $virtual_token \
+  --k_shot_example 16;
+```
+

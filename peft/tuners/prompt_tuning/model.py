@@ -58,8 +58,19 @@ class PromptEmbedding(BaseEmbedding):
     """
     def __init__(self, config, word_embeddings):
         super().__init__(config, word_embeddings)
-    
+        self.desired_norm = 5000
+
+        self.num_modules = config.num_transformer_submodules
+        self.num_virtual_tokens = config.num_virtual_tokens
+
     def forward(self, indices):
         # Just get embeddings
         prompt_embeddings = self.embedding(indices)
+
+        norms = torch.norm(prompt_embeddings, dim=2, keepdim=True)
+        # norms = torch.linalg.svdvals(prompt_embeddings[0]).max()
+        scaling_factors = self.desired_norm / norms
+        
+        prompt_embeddings = prompt_embeddings * scaling_factors
+        
         return prompt_embeddings

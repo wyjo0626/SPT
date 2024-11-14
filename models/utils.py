@@ -138,7 +138,7 @@ def get_trainer(model_args, data_args, training_args, peft_args, Dataset):
     if any(x in model_args.model_name_or_path for x in ["bert", "roberta", "albert"]):
         logger.info(f"Loading encoder model from {model_args.model_name_or_path}.")
         task_type = TaskType.SEQ_CLS
-    elif any(x in model_args.model_name_or_path for x in ["t5"]):
+    elif any(x in model_args.model_name_or_path for x in ["t5", "pegasus", "bart"]):
         logger.info(f"Loading seq2seq model from {model_args.model_name_or_path}.")
         task_type = TaskType.SEQ_2_SEQ_LM
     elif any(x in model_args.model_name_or_path for x in ["gpt", "bloom"]): # TODO : add 라마 추가하기

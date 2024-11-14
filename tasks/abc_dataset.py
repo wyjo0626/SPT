@@ -201,7 +201,7 @@ class AbstractDataset(ABC):
             logger.info(f"Loading encoder model from {self.model_args.model_name_or_path}")
             tokenize_function = self.encoder_preprocess_function
             self.compute_metrics = self.compute_metrics_encoder
-        elif any(x in self.model_args.model_name_or_path for x in ["t5"]):
+        elif any(x in self.model_args.model_name_or_path for x in ["t5", "pegasus", "bart"]):
             logger.info(f"Loading seq2seq model from {self.model_args.model_name_or_path}")
             tokenize_function = self.seq2seq_preprocess_function
             self.compute_metrics = self.compute_metrics_seq2seq
@@ -283,19 +283,23 @@ class AbstractDataset(ABC):
     
     def decoder_preprocess_function(self, examples, split):
         batch_size = len(examples['source'])
-        inputs = [f"{x} Label : " for x in examples['source']]
-        model_inputs = self.tokenizer(inputs)
+        model_inputs = self.tokenizer(examples['source'])
+        prefix_label = self.tokenizer(" Label : ")["input_ids"]
         labels = self.tokenizer(examples['target'])
         
         for i in range(batch_size):
             sample_input_ids = model_inputs["input_ids"][i]
-            label_input_ids = labels["input_ids"][i] + [self.tokenizer.eos_token_id]
-            if "train" in split:
-                model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
-            else:
-                model_inputs["input_ids"][i] = sample_input_ids
-            labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+            label_input_ids = labels["input_ids"][i]
+
+            prefix_length = len(prefix_label) + len(label_input_ids)
+            prefix_input_ids = prefix_label + label_input_ids
+            
+            if len(sample_input_ids) > (self.data_args.max_seq_length - prefix_length):
+                sample_input_ids = sample_input_ids[:self.data_args.max_seq_length - prefix_length]
+            
+            model_inputs["input_ids"][i] = sample_input_ids + prefix_input_ids
             model_inputs["attention_mask"][i] = [1] * len(model_inputs["input_ids"][i])
+            labels["input_ids"][i] = label_input_ids
 
         for i in range(batch_size):
             sample_input_ids = model_inputs["input_ids"][i]
@@ -306,16 +310,7 @@ class AbstractDataset(ABC):
             model_inputs["attention_mask"][i] = [0] * (self.data_args.max_seq_length - len(sample_input_ids)) + model_inputs[
                 "attention_mask"
             ][i]
-            if "train" in split:
-                if (self.task == "glue" or self.task == "super_glue") and self.data_args.max_seq_length - len(sample_input_ids) < 0:
-                    # Some data have a sequence longer than data_args.max_seq_length, 
-                    # the label might not be processed correctly, 
-                    # such as max_seq_length=3, label["input_ids"] = [-100, -100, -100, -100, 101, 1015, 102, 0]
-                    labels["input_ids"][i] = label_input_ids[len(sample_input_ids) - self.data_args.max_seq_length:]
-                else:
-                    labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(sample_input_ids)) + label_input_ids
-            else:
-                labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(label_input_ids)) + label_input_ids
+            labels["input_ids"][i] = [-100] * (self.data_args.max_seq_length - len(label_input_ids)) + label_input_ids
             model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][:self.data_args.max_seq_length])
             model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][:self.data_args.max_seq_length])
             labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][:self.data_args.max_seq_length])
