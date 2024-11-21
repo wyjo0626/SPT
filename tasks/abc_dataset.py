@@ -286,13 +286,17 @@ class AbstractDataset(ABC):
         model_inputs = self.tokenizer(examples['source'])
         prefix_label = self.tokenizer(" Label : ")["input_ids"]
         labels = self.tokenizer(examples['target'])
-        
+
         for i in range(batch_size):
             sample_input_ids = model_inputs["input_ids"][i]
-            label_input_ids = labels["input_ids"][i]
+            label_input_ids = labels["input_ids"][i] + [self.tokenizer.eos_token_id]
 
-            prefix_length = len(prefix_label) + len(label_input_ids)
-            prefix_input_ids = prefix_label + label_input_ids
+            if split == "train":
+                prefix_length = len(prefix_label) + len(label_input_ids)
+                prefix_input_ids = prefix_label + label_input_ids
+            else:
+                prefix_length = len(prefix_label)
+                prefix_input_ids = prefix_label
             
             if len(sample_input_ids) > (self.data_args.max_seq_length - prefix_length):
                 sample_input_ids = sample_input_ids[:self.data_args.max_seq_length - prefix_length]
