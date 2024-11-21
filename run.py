@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import numpy as np
+from datasets import concatenate_datasets
 
 import datasets
 import transformers
@@ -118,7 +119,52 @@ if __name__ == "__main__":
     set_seed(training_args.seed)
     
     trainer, dataset = get_trainer(model_args, data_args, training_args, peft_args, dataset)
-    
+
+    if data_args.long_tail is not None and data_args.task_name.lower() in ["super_glue", "glue"] and len(dataset.raw_datasets["train"].features["label"].names) == 2:
+        def label_decode(label, tokenizer):
+            label = np.array(label)
+            label[label < 0] = tokenizer.pad_token_id
+            label = tokenizer.decode(label, skip_special_tokens=True)
+            return label
+
+        train_data = dataset.train_dataset
+        predict_data = dataset.predict_dataset
+        tokenizer = trainer.tokenizer
+
+        train_data_1 = train_data.filter(lambda example: label_decode(example['labels'], tokenizer) == '1')
+        train_data_0 = train_data.filter(lambda example: label_decode(example['labels'], tokenizer) == '0')
+        test_data_1 = predict_data.filter(lambda example: label_decode(example['labels'], tokenizer) == '1')
+        test_data_0 = predict_data.filter(lambda example: label_decode(example['labels'], tokenizer) == '0')
+        
+        logger.info(f"Train label Counts ['1' : {len(train_data_1)}, '0' : {len(train_data_0)}]")
+        logger.info(f"Test label Counts ['1' : {len(test_data_1)}, '0' : {len(test_data_0)}]")
+        
+        if len(test_data_1) > len(test_data_0):
+            target_data = train_data_1
+            untarget_data = train_data_0
+            logger.info(f"Label 1 is targeted!")
+        else:
+            target_data = train_data_0
+            untarget_data = train_data_1
+            logger.info(f"Label 0 is targeted!")
+
+        if data_args.long_tail == 10:
+            target_data = target_data.select(range(0, round(len(untarget_data) / 9)))
+        elif data_args.long_tail == 20:
+            target_data = target_data.select(range(0, round(len(untarget_data) / 4)))
+        elif data_args.long_tail == 30:
+            target_data = target_data.select(range(0, round(len(untarget_data) * 3 / 7)))
+
+        if len(test_data_1) > len(test_data_0):
+            logger.info(f"Long-tailed Train label Counts ['1' : {len(target_data)}, '0' : {len(untarget_data)}]")
+        else:
+            logger.info(f"Long-tailed Train label Counts ['1' : {len(untarget_data)}, '0' : {len(target_data)}]")
+
+        balanced_data = concatenate_datasets([target_data, untarget_data]).shuffle(seed=training_args.seed)
+
+        dataset.train_dataset = balanced_data
+        trainer.train_dataset = balanced_data
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:

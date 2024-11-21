@@ -148,7 +148,12 @@ class DataTrainingArguments:
             "help": "The number of examples to use for the k-shot learning."
         }
     )
-
+    long_tail: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "Long-tail"
+        }
+    )
 
 @dataclass
 class ModelArguments:
